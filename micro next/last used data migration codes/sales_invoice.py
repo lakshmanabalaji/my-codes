@@ -22,8 +22,8 @@ header_mapping = {
 }
 
 # Input and output file paths
-input_file_unorder = "sales.csv"
-output_file = "outputSI.csv"
+input_file_unorder = "ITEM WISE SALES INVOICE REPORT.xlsx"  # This is the input CSV file with unordered data
+output_file = "sales invoice june data.csv"
 charges_file = "Sales Register.xlsx"  # Assuming this is the file with charge values
 
 # Read the charges Excel file to create a lookup dictionary
@@ -38,7 +38,7 @@ def get_charge_values():
         return {}
 
 # Read the CSV
-df = pd.read_csv(input_file_unorder)
+df = pd.read_excel(input_file_unorder)
 
 # Sort by Voucher No, Date, Item Name
 # (Adjust columns based on your actual CSV — for example 'Date', 'Item Name', etc.)
@@ -87,10 +87,16 @@ def transform_csv():
                 new_row["Item (Items)"] = new_row["Item (Items)"].lstrip("SSWIG0")
 
             #Modify SGST Rate (Items) and CGST Rate (Items) to take value from tax column on input csv and divide by 2
-            if "SGST Rate (Items)" in new_row and new_row["SGST Rate (Items)"]:
-                new_row["SGST Rate (Items)"] = str(float(new_row["SGST Rate (Items)"]) / 2)
-                new_row["CGST Rate (Items)"] = new_row["SGST Rate (Items)"]
-
+                        # Modify SGST Rate (Items) and CGST Rate (Items) to take value from tax column on input csv and divide by 2
+            if "SGST Rate (Items)" in new_row:
+                try:
+                    rate = float(new_row["SGST Rate (Items)"])
+                    new_row["SGST Rate (Items)"] = str(rate / 2)
+                    new_row["CGST Rate (Items)"] = new_row["SGST Rate (Items)"]
+                except (ValueError, TypeError):
+                    new_row["SGST Rate (Items)"] = "0"
+                    new_row["CGST Rate (Items)"] = "0"
+                    
             # Modify the Quantity (Items) column to keep only the numeric part before any text appears
             if "Quantity (Items)" in new_row and new_row["Quantity (Items)"]:
                 new_row["Quantity (Items)"] = ''.join(c for c in new_row["Quantity (Items)"] if c.isdigit() or c == ' ').split()[0]
