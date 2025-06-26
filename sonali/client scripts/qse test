@@ -1,0 +1,206 @@
+frappe.listview_settings['Stock Entry'] = {
+    onload: function (listview) {
+        console.log("✅ Stock Entry List View Loaded");
+
+        // QSE METER Button
+        listview.page.add_inner_button('QSE METER', function () {
+            let dialog = new frappe.ui.Dialog({
+                title: 'Quick Stock Entry (METER)',
+                fields: [
+                    {
+                        fieldname: 'item_code',
+                        label: 'Item Code',
+                        fieldtype: 'Link',
+                        options: 'Item',
+                        reqd: 1,
+                        get_query: () => ({
+                            filters: { item_group: ["in", ["Products"]] }
+                        })
+                    },
+                    { fieldname: 'length', label: 'Length (m)', fieldtype: 'Float', reqd: 1 },
+                    { fieldname: 'quantity', label: 'Quantity', fieldtype: 'Int', reqd: 1 },
+                    { fieldname: 'serial_no', label: 'Serial Number(s)', fieldtype: 'Small Text', hidden: 1 },
+                    { fieldname: 'print_btn', fieldtype: 'Button', label: 'Print All Serial Nos', hidden: 1 }
+                ],
+                primary_action_label: 'Submit',
+                primary_action(values) {
+                    let created_serials = [];
+                    let counter = 0;
+
+                    function create_entry_loop() {
+                        if (counter >= values.quantity) {
+                            const serials_str = created_serials.join(", ");
+                            dialog.set_value('serial_no', serials_str);
+                            dialog.fields_dict.serial_no.df.hidden = 0;
+                            dialog.fields_dict.print_btn.df.hidden = 0;
+                            dialog.refresh();
+
+                            frappe.show_alert({ message: __('All Stock Entries Created'), indicator: 'green' }, 3);
+
+                            let currentIndex = 0;
+
+                            function openNextSerialPrint() {
+                                if (currentIndex >= created_serials.length) {
+                                    frappe.show_alert("✅ All serials printed");
+                                    return;
+                                }
+
+                                const serial = created_serials[currentIndex];
+                                const url = frappe.urllib.get_full_url(`/printview?doctype=Serial No&name=${serial}&trigger_print=1`);
+                                window.open(url, '_blank');
+
+                                frappe.msgprint({
+                                    title: __("Print Serial No"),
+                                    message: `Printed <b>${serial}</b>. Click Next to print the next one.`,
+                                    primary_action: {
+                                        label: "Next",
+                                        action: () => {
+                                            currentIndex++;
+                                            openNextSerialPrint();
+                                        }
+                                    }
+                                });
+                            }
+
+                            dialog.fields_dict.print_btn.$wrapper.find('button').on('click', function () {
+                                currentIndex = 0;
+                                openNextSerialPrint();
+                            });
+
+                            return;
+                        }
+
+                        frappe.call({
+                            method: "sonali.custom_functions.Stock_Entry.create_and_submit_stock_entry_meter",
+                            args: {
+                                item_code: values.item_code,
+                                length: values.length
+                            },
+                            callback: function (response) {
+                                if (response.message && response.message.status === "Submitted") {
+                                    let serial_no = response.message.serial_numbers?.[0] || "N/A";
+                                    created_serials.push(serial_no);
+
+                                    let today = new Date();
+                                    let formatted_date = today.getDate().toString().padStart(2, '0') + "-" +
+                                        (today.getMonth() + 1).toString().padStart(2, '0') + "-" +
+                                        today.getFullYear();
+
+                                    if (serial_no !== "N/A") {
+                                        frappe.call({
+                                            method: "frappe.client.set_value",
+                                            args: {
+                                                doctype: "Serial No",
+                                                name: serial_no,
+                                                fieldname: {
+                                                    custom_length: values.length,
+                                                    custom_mfgdate1: formatted_date
+                                                }
+                                            },
+                                            callback: function (res) {
+                                                if (!res.exc) {
+                                                    console.log(`✅ Serial No ${serial_no} updated.`);
+                                                }
+                                            }
+                                        });
+                                    }
+                                } else {
+                                    const error_msg = (response.message && response.message.error) || response.exc || "Unknown error";
+                                    frappe.msgprint('Error: ' + error_msg);
+                                }
+
+                                counter++;
+                                create_entry_loop();
+                            }
+                        });
+                    }
+
+                    create_entry_loop();
+                }
+            });
+
+            dialog.show();
+        });
+
+        // QSE KG Button (unchanged)
+        listview.page.add_inner_button('QSE KG', function () {
+            let dialog = new frappe.ui.Dialog({
+                title: 'Quick Stock Entry (KG)',
+                fields: [
+                    {
+                        fieldname: 'item_code',
+                        label: 'Item Code',
+                        fieldtype: 'Link',
+                        options: 'Item',
+                        reqd: 1,
+                        get_query: () => ({
+                            filters: { item_group: "Products" }
+                        })
+                    },
+                    { fieldname: 'weight', label: 'Weight (kg)', fieldtype: 'Float', reqd: 1 },
+                    { fieldname: 'serial_no', label: 'Serial Number', fieldtype: 'Data', hidden: 1 },
+                    { fieldname: 'print_btn', fieldtype: 'Button', label: 'Print Stock Entry', hidden: 1 }
+                ],
+                primary_action_label: 'Submit',
+                primary_action(values) {
+                    frappe.call({
+                        method: "sonali.custom_functions.Stock_Entry.create_and_submit_stock_entry",
+                        args: {
+                            item_code: values.item_code,
+                            weight: values.weight
+                        },
+                        callback: function (response) {
+                            if (response.message && response.message.status === "Submitted") {
+                                let serial_no = response.message.serial_numbers?.[0] || "N/A";
+                                dialog.set_value('serial_no', serial_no);
+                                dialog.fields_dict.serial_no.df.hidden = 0;
+                                dialog.fields_dict.print_btn.df.hidden = 0;
+                                dialog.refresh();
+
+                                frappe.show_alert({ message: __('Stock Entry Created: ' + response.message.name), indicator: 'green' }, 3);
+
+                                let today = new Date();
+                                let formatted_date = today.getDate().toString().padStart(2, '0') + "-" +
+                                    (today.getMonth() + 1).toString().padStart(2, '0') + "-" +
+                                    today.getFullYear();
+
+                                if (serial_no !== "N/A") {
+                                    frappe.call({
+                                        method: "frappe.client.set_value",
+                                        args: {
+                                            doctype: "Serial No",
+                                            name: serial_no,
+                                            fieldname: {
+                                                custom_weight: values.weight,
+                                                custom_mfgdate1: formatted_date
+                                            }
+                                        },
+                                        callback: function (res) {
+                                            if (!res.exc) {
+                                                frappe.show_alert({ message: __('Serial No updated'), indicator: 'green' }, 3);
+                                            } else {
+                                                frappe.msgprint("Failed to update Serial No.");
+                                            }
+                                        }
+                                    });
+                                }
+
+                                dialog.fields_dict.print_btn.$wrapper.find('button').on('click', function () {
+                                    frappe.set_route("print", "Serial No", serial_no);
+                                });
+
+                            } else {
+                                const error_msg = (response.message && response.message.error) || response.exc || "Unknown error";
+                                frappe.msgprint('Error: ' + error_msg);
+                            }
+                        }
+                    });
+                }
+            });
+
+            dialog.show();
+        });
+
+        console.log("🛠️ QSE METER and QSE KG Buttons Added to Stock Entry List View.");
+    }
+};
