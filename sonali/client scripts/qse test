@@ -24,6 +24,10 @@ frappe.listview_settings['Stock Entry'] = {
                 ],
                 primary_action_label: 'Submit',
                 primary_action(values) {
+                    // Disable and hide submit button after first click
+                    dialog.get_primary_btn().addClass('disabled');
+                    dialog.get_primary_btn().hide();
+
                     let created_serials = [];
                     let counter = 0;
 
@@ -46,7 +50,7 @@ frappe.listview_settings['Stock Entry'] = {
                                 }
 
                                 const serial = created_serials[currentIndex];
-                                const url = frappe.urllib.get_full_url(`/printview?doctype=Serial No&name=${serial}&trigger_print=1`);
+                                const url = frappe.urllib.get_full_url(`/printview?doctype=Serial No&name=${serial}&format=3CF Box&trigger_print=1`);
                                 window.open(url, '_blank');
 
                                 frappe.msgprint({
