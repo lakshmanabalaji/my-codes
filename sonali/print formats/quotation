@@ -48,7 +48,7 @@
 <table style="width: 100%; margin-bottom: 10px; border: hidden !important">
   <tr>
     <td style="text-align: left; border: hidden !important">
-      <strong>Quotation Valid Till:</strong> {{ frappe.utils.formatdate(doc.valid_till, "dd-mm-yyyy") }}
+      <strong>Quotation Valid Till:</strong> {{ frappe.utils.formatdate(doc.valid_till, "dd-mm-yyyy") }}<br>
     </td>
     <td style="text-align: right; border: hidden !important">
       <strong>Quotation Copy</strong>
@@ -82,7 +82,7 @@
       <strong>Quotation No:</strong> {{ doc.name }}<br>
       <strong>Date:</strong> {{ frappe.utils.formatdate(doc.transaction_date, "dd-mm-yyyy") }}<br>
       <strong>Valid Till:</strong> {{ frappe.utils.formatdate(doc.valid_till, "dd-mm-yyyy") }}<br>
-      
+      <strong>Prepared By:</strong> {{doc.custom_prepared_by}} <br>
       {% if doc.po_no %}<strong>PO Ref:</strong> {{ doc.po_no }}<br>{% endif %}
     </td>
   </tr>
