@@ -1,39 +1,39 @@
 SELECT
-    sle.item_code AS "Item:Link/Item:150",
-    sle.warehouse AS "Warehouse:Link/Warehouse:180",
+    b.item_code AS "Item:Link/Item:150",
+    b.warehouse AS "Warehouse:Link/Warehouse:180",
 
     -- Box Qty
-    SUM(CASE 
-        WHEN LOWER(i.sales_uom) = 'box' THEN sle.actual_qty 
+    CASE 
+        WHEN LOWER(i.sales_uom) = 'box' THEN b.actual_qty 
         ELSE 0 
-    END) AS "Box Qty:Float:100",
+    END AS "Box Qty:Float:100",
 
     -- Weight Qty
-    SUM(CASE 
-        WHEN LOWER(i.sales_uom) IN ('kg', 'g', 'gram', 'ton') THEN sle.actual_qty 
+    CASE 
+        WHEN LOWER(i.sales_uom) IN ('kg', 'g', 'gram', 'ton') THEN b.actual_qty 
         ELSE 0 
-    END) AS "Weight Qty:Float:100",
+    END AS "Weight Qty:Float:100",
 
     -- Length Qty
-    SUM(CASE 
-        WHEN LOWER(i.sales_uom) IN ('m', 'meter', 'cm', 'mm') THEN sle.actual_qty 
+    CASE 
+        WHEN LOWER(i.sales_uom) IN ('m', 'meter', 'cm', 'mm') THEN b.actual_qty 
         ELSE 0 
-    END) AS "Length Qty:Float:100",
+    END AS "Length Qty:Float:100",
 
-    SUM(sle.stock_value_difference) AS "Stock Value:Currency:120"
+    b.stock_value AS "Stock Value:Currency:120"
 
 FROM 
-    `tabStock Ledger Entry` sle
+    `tabBin` b
 JOIN 
-    `tabItem` i ON sle.item_code = i.name
+    `tabItem` i ON b.item_code = i.name
 
 WHERE 
-    sle.docstatus < 2
-    AND sle.posting_date >= '2025-01-01'
-    AND sle.posting_date <= '2025-06-15'
-
-GROUP BY 
-    sle.item_code, sle.warehouse
+    b.actual_qty != 0
+    AND (
+        (LOWER(i.sales_uom) = 'box')
+        OR (LOWER(i.sales_uom) IN ('kg', 'g', 'gram', 'ton'))
+        OR (LOWER(i.sales_uom) IN ('m', 'meter', 'cm', 'mm'))
+    )
 
 ORDER BY 
-    sle.item_code, sle.warehouse
+    b.item_code, b.warehouse
