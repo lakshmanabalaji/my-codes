@@ -66,7 +66,7 @@
 
 <table class="header-table">
   <tr>
-    <td style="width: 59.5%; line-height: 1.2;">
+    <td style="width: 35%; line-height: 1.2;">
       <strong>Bill To:</strong><br>
       <b>{{ doc.customer_name or 'missing customer' }}</b><br>
       {% if doc.customer_address %}
@@ -77,12 +77,22 @@
         GSTIN: {{ billing_address.gstin if billing_address.gstin else 'N/A' }}
       {% endif %}
     </td>
-    <td class="text-left" style="width: 40.5%; line-height: 1.2;">
+    <td style="width: 35%; line-height: 1.2;">
+      {% if doc.shipping_address_name %}
+        {% set s_address = frappe.get_doc("Address", doc.shipping_address_name) %}
+        <strong>Ship To:</strong><br>
+        <b>{{ s_address.address_title or 'missing title' }}</b><br>
+        {{ s_address.address_line1 }}<br>
+        {% if s_address.address_line2 %}{{ s_address.address_line2 }}<br>{% endif %}
+        {{ s_address.city }}, {{ s_address.state }} - {{ s_address.pincode }}<br>
+        GSTIN: {{ s_address.gstin if s_address.gstin else 'N/A' }}
+      {% endif %}
+    </td>
+    <td class="text-left" style="width: 35%; line-height: 1.2;">
       <div class="invoice-title">QUOTATION</div>
       <strong>Quotation No:</strong> {{ doc.name }}<br>
       <strong>Date:</strong> {{ frappe.utils.formatdate(doc.transaction_date, "dd-mm-yyyy") }}<br>
       <strong>Valid Till:</strong> {{ frappe.utils.formatdate(doc.valid_till, "dd-mm-yyyy") }}<br>
-      <strong>Prepared By:</strong> {{doc.custom_prepared_by}} <br>
       {% if doc.po_no %}<strong>PO Ref:</strong> {{ doc.po_no }}<br>{% endif %}
     </td>
   </tr>
@@ -128,13 +138,13 @@
 <table style="border-style: hidden !important; border-left: 1px solid black !important; border-right: 1px solid black !important; border-collapse: collapse;">
   <tr>
     <td style="width: 50%; vertical-align: top; padding: 10px; border-right: 1px solid black;">
-      <p style="font-size: 15px !important; font-weight: bold;">Terms & Conditions:</p>
-      <ol style="font-size: 10px !important; margin-top: 5px;">
+        <p style="font-size: 15px !important; font-weight: bold;">Terms & Conditions:</p>
+    <ol style="font-size: 10px !important; margin-top: 5px; padding-left: 2px; list-style-position: inside;">
         <li>Prices are exclusive of taxes unless stated otherwise.</li>
         <li>Validity as per quotation.</li>
         <li>Subject to Coimbatore jurisdiction.</li>
         <li>Delivery as per mutual agreement.</li>
-      </ol>
+    </ol>
     </td>
     <td style="width: 50%; vertical-align: top; padding: 10px;">
       <table style="width: 100%; border-style: hidden !important;">
@@ -157,6 +167,15 @@
   </tr>
 </table>
 
+<!-- IN WORDS SECTION -->
+<table style="width: 99.50%; border-collapse: collapse; border-left: 1px solid black; border-right: 1px solid black; border-bottom: 1px solid black;">
+  <tr>
+    <td style="padding: 10px;">
+      <strong>IN WORDS:</strong> ₹ {{ doc.in_words.replace("INR", "").strip() }}
+    </td>
+  </tr>
+</table>
+
 <!-- 🏦 BANK DETAILS (Above IN WORDS section) -->
 <table style="width: 99.50%; border-collapse: collapse; border-left: 1px solid black; border-right: 1px solid black;">
   <tr>
@@ -171,14 +190,25 @@
   </tr>
 </table>
 
-<!-- IN WORDS SECTION -->
 <table style="width: 99.50%; border-collapse: collapse; border-left: 1px solid black; border-right: 1px solid black; border-bottom: 1px solid black;">
   <tr>
     <td style="padding: 10px;">
-      <strong>IN WORDS:</strong> ₹ {{ doc.in_words.replace("INR", "").strip() }}
+      <p>{{doc.custom_additional_notes}}</p><br>
     </td>
   </tr>
 </table>
+
+<table style="width: 99.50%; border-collapse: collapse; border-left: 1px solid black; border-right: 1px solid black; border-bottom: 1px solid black;">
+  <tr>
+    <td style="padding: 10px; padding-bottom:20px; text-align: center;">
+      <strong>Prepared By</strong> <br><br> {{ frappe.get_fullname(doc.owner) }}
+    </td>
+    <td style="padding: 10px; padding-bottom:20px; text-align: center;">
+      <strong>Authorised Signature</strong> <br><br>
+    </td>
+  </tr>
+</table>
+
 
 </body>
 </html>
