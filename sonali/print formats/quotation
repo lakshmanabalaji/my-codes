@@ -8,6 +8,10 @@
         margin-left: 15mm;
         margin-right: 15mm;
         size: A4;
+        @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 10px;
+    }
     }
     body {
         font-size: 12px;
@@ -97,12 +101,20 @@
     </td>
   </tr>
 </table>
-
+<table style="width: 99.50%; border-collapse: collapse; border-left: 1px solid black; border-right: 1px solid black;">
+  <tr>
+    <td style="padding: 10px; font-size: 13px;border-top: none;border-bottom: none;">
+      We thankfully acknowledge your Enquiry & hereby submit our Offer as below:<br>
+      Best prices for Housing and Industrial wires, inclusive of BIS-certified quality assurance.
+    </td>
+  </tr>
+</table>
 {% set ns = namespace(total=0) %}
-<table class="items-table" style="border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+<table class="items-table" style="border-style: hidden !important; border-bottom: 1px solid black !important; border-top: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
   <thead>
     <tr>
       <th>S/N</th>
+      <th>Item Code</th>      
       <th>HSN</th>
       <th>Description of Goods</th>
       <th>Rate</th>
@@ -117,6 +129,7 @@
     {% for item in doc.items %}
     <tr>
       <td class="text-center">{{ loop.index }}</td>
+      <td class="text-center">{{ item.item_code}}</td>      
       <td class="text-center">{{ item.gst_hsn_code or "" }}</td>
       <td class="text-center">{{ item.description }}</td>
       <td class="text-center">{{ item.rate }}</td>
@@ -138,13 +151,10 @@
 <table style="border-style: hidden !important; border-left: 1px solid black !important; border-right: 1px solid black !important; border-collapse: collapse;">
   <tr>
     <td style="width: 50%; vertical-align: top; padding: 10px; border-right: 1px solid black;">
-        <p style="font-size: 15px !important; font-weight: bold;">Terms & Conditions:</p>
-    <ol style="font-size: 10px !important; margin-top: 5px; padding-left: 2px; list-style-position: inside;">
-        <li>Prices are exclusive of taxes unless stated otherwise.</li>
-        <li>Validity as per quotation.</li>
-        <li>Subject to Coimbatore jurisdiction.</li>
-        <li>Delivery as per mutual agreement.</li>
-    </ol>
+      <p style="font-size: 15px !important; font-weight: bold;">Terms & Conditions:</p>
+      <div style="line-height: 1.2; font-size: 10px;">
+        {{ doc.terms | safe }}
+      </div>
     </td>
     <td style="width: 50%; vertical-align: top; padding: 10px;">
       <table style="width: 100%; border-style: hidden !important;">
@@ -204,7 +214,9 @@
       <strong>Prepared By</strong> <br><br> {{ frappe.get_fullname(doc.owner) }}
     </td>
     <td style="padding: 10px; padding-bottom:20px; text-align: center;">
-      <strong>Authorised Signature</strong> <br><br>
+      <strong>Authorised Signature</strong> <br><br> <p>Sundar.R - GM - Business Administration 
+
+</p>
     </td>
   </tr>
 </table>
