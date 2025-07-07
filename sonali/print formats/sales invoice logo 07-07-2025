@@ -181,7 +181,11 @@
                         {% set value = 0 %}
                     {% endif %}
                 
-                    {{ "%.3f"|format(value) }}
+                    {% if value == value|int %}
+                        {{ value|int }}
+                    {% else %}
+                        {{ "%.3f"|format(value) }}
+                    {% endif %}
                 </td>
                 
                 <td style="text-align: center;">

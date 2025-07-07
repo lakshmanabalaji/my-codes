@@ -186,7 +186,11 @@
                         {% set value = 0 %}
                     {% endif %}
                 
-                    {{ "%.3f"|format(value) }}
+                    {% if value == value|int %}
+                        {{ value|int }}
+                    {% else %}
+                        {{ "%.3f"|format(value) }}
+                    {% endif %}
                 </td>
 
                 
@@ -441,7 +445,6 @@
                 <td style="text-align: center;">{{ item.gst_hsn_code or " "}}</td>
                 <td style="text-align: center;">{{ item.description }}</td>
                 <td style="text-align: center;">{{ item.rate }}</td>
-
                 <td style="text-align: center;">
                     {% set weight = item.custom_weight_in_kg|float %}
                     {% set length = item.custom_length_in_meter|float %}
@@ -460,7 +463,11 @@
                         {% set value = 0 %}
                     {% endif %}
                 
-                    {{ "%.3f"|format(value) }}
+                    {% if value == value|int %}
+                        {{ value|int }}
+                    {% else %}
+                        {{ "%.3f"|format(value) }}
+                    {% endif %}
                 </td>
                 
                 <td style="text-align: center;">
@@ -709,7 +716,6 @@
                 <td style="text-align: center;">{{ item.gst_hsn_code or " "}}</td>
                 <td style="text-align: center;">{{ item.description }}</td>
                 <td style="text-align: center;">{{ item.rate }}</td>
-
                 <td style="text-align: center;">
                     {% set weight = item.custom_weight_in_kg|float %}
                     {% set length = item.custom_length_in_meter|float %}
@@ -728,7 +734,11 @@
                         {% set value = 0 %}
                     {% endif %}
                 
-                    {{ "%.3f"|format(value) }}
+                    {% if value == value|int %}
+                        {{ value|int }}
+                    {% else %}
+                        {{ "%.3f"|format(value) }}
+                    {% endif %}
                 </td>
                 
                 <td style="text-align: center;">
@@ -1006,7 +1016,11 @@
                         {% set value = 0 %}
                     {% endif %}
                 
-                    {{ "%.3f"|format(value) }}
+                    {% if value == value|int %}
+                        {{ value|int }}
+                    {% else %}
+                        {{ "%.3f"|format(value) }}
+                    {% endif %}
                 </td>
                 
                 <td style="text-align: center;">
