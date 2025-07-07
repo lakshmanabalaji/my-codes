@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/assets/frappe/css/printview.css">
+    <style>
+        .payslip-container {
+            max-width: 800px;
+            margin: auto;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            color: #000;
+        }
+
+        .footer {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .company-logo {
+            height: 50px;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .sub-title {
+            font-size: 14px;
+        }
+
+        .section {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .section div {
+            width: 48%;
+            line-height: 1.6;
+        }
+
+        .table {
+            width: 99.50%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        .table th, .table td {
+            border: 1px solid #000;
+            padding: 6px 10px;
+            text-align: right;
+        }
+
+        .table th {
+            text-align: left;
+            color: #000; /* Ensure table headers are black */
+        }
+
+
+        .total-row {
+            font-weight: bold;
+        }
+
+        .net-pay {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .amount-words {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .footer-note {
+            font-size: 14px;
+            text-align: center;
+        }
+        .logo-table {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        
+        .logo-cell {
+            width: 120px;
+            vertical-align: top;
+        }
+        
+        .logo-info-cell {
+            text-align: center;
+            vertical-align: top;
+            font-size: 14px;
+        }
+        
+        .logo-image {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+        }
+        
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .sub-title {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+                
+        /*.payslip-title {*/
+        /*    margin-top: 60px;*/
+        /*    font-weight: bold;*/
+        /*    text-align: center;*/
+        /*}*/
+
+    </style>
+</head>
+<body>
+    <div class="payslip-container">
+        <table class="logo-table">
+          <tr>
+            <!-- Left: Logo -->
+            <td class="logo-cell">
+              {% set company_name = frappe.db.get_single_value("Global Defaults", "default_company") %}
+              {% if company_name %}
+                {% set company = frappe.get_doc("Company", company_name) %}
+                {% if company.logo_for_printing %}
+                  <img src="{{ frappe.utils.get_url(company.logo_for_printing) }}" alt="Company Logo" class="logo-image">
+                {% endif %}
+              {% endif %}
+            </td>
+        
+            <!-- Right: Company Info and Payslip Month -->
+            <td class="logo-info-cell">
+              <div class="title">Srinath Sanitarywares</div>
+              <div class="sub-title">
+                #1010, Srinath Mansion, Dr. Rajkumar road Rajajinagar<br>
+                Bangalore - 560010 <br> <br> <br>
+                <strong>Payslip {{ frappe.utils.formatdate(doc.posting_date, "MMMM yyyy") }}</strong>
+              </div>
+            </td>
+            <td style="width: 120px;"></td>
+          </tr>
+        </table>
+        
+        <div class="section">
+            <div>
+                <b>Employee Code</b> : {{ doc.employee }}<br>
+                <b>Department</b> : {{ doc.department }}<br>
+                <b>Date Of Joining</b> : {{ frappe.utils.formatdate(doc.date_of_joining) }}<br>
+                <b>Total Working Days</b> : {{ doc.total_working_days }} day(s)<br>
+                <b>LOP</b> : {{ doc.leave_without_pay }} day(s)
+            </div>
+            <div>
+                <b>Name</b> : {{ doc.employee_name }}<br>
+                <b>Designation</b> : {{ doc.designation }}<br>
+                <b>Paid Days</b> : {{ doc.payment_days }} day(s)
+            </div>
+        </div>
+
+        <table class="table">
+            <tr>
+                <th>EARNINGS</th>
+                <th></th>
+                <th>DEDUCTIONS</th>
+                <th></th>
+            </tr>
+            {% set earnings = doc.earnings %}
+            {% set deductions = doc.deductions %}
+            {% set max_rows = [earnings|length, deductions|length]|max %}
+
+            {% for i in range(max_rows) %}
+            <tr>
+                <td>{{ earnings[i].salary_component if i < earnings|length else '' }}</td>
+                <td>{{ frappe.utils.fmt_money(earnings[i].amount) if i < earnings|length else '' }}</td>
+                <td>{{ deductions[i].salary_component if i < deductions|length else '' }}</td>
+                <td>{{ frappe.utils.fmt_money(deductions[i].amount) if i < deductions|length else '' }}</td>
+            </tr>
+            {% endfor %}
+
+            <tr class="total-row">
+                <td>Total Earnings</td>
+                <td>{{ frappe.utils.fmt_money(doc.gross_pay) }}</td>
+                <td>Total Deductions</td>
+                <td>{{ frappe.utils.fmt_money(doc.total_deduction) }}</td>
+            </tr>
+        </table>
+
+        <div class="net-pay">Net Pay Rs. {{ frappe.utils.fmt_money(doc.net_pay) }}</div>
+        <div class="amount-words">Amount (in words): {{ doc.total_in_words }}</div>
+
+        <div class="footer-note">
+            This is a system generated Payslip.<br>
+            No Signature required for digital copy.
+        </div>
+    </div>
+</body>
+</html>

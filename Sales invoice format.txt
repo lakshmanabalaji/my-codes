@@ -1,0 +1,826 @@
+{% set money_in_words = frappe.utils.money_in_words %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Invoice</title>
+    <style>
+        /* Main Styling */
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 8px;
+            margin: 0;
+            padding: 0;
+            color: #000 !important;
+        }
+        .main-table {
+            border-top: 1px solid black !important;
+            border-bottom: 1px solid black !important;
+            border-left: 1px solid black !important;
+            border-right: 1px solid black !important;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+        }
+        .main-table th, .main-table td {
+            border: 1px solid #000;
+            padding: 6px;
+            vertical-align: top;
+            overflow: hidden;
+        }
+        
+        /* Header Styles */
+        .header-section {
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            line-height: 12px;
+        }
+        .footer-section {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            background: white;
+            z-index: 100;
+            height: 50mm;
+        }
+        .content-section {
+            margin-bottom: 55mm; /* Increased to prevent footer overlap */
+        }
+        .tax-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .tax-table th, .tax-table td {
+            border: 1px solid #000;
+            padding: 6px;
+            text-align: right;
+        }
+        
+        /* Utility Classes */
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .text-left {
+            text-align: left !important;
+        }
+        .amount_in_words {
+            border-top:1px solid black !important;
+            border-bottom: 1px solid black !important;
+            border-left: 1px solid black !important;
+            border-right: 1px solid black !important;
+            width: 100%;
+        }
+        .tax-table {
+            border-style: hidden !important;
+            border-bottom: 1px solid black !important;
+            border-left: 1px solid black !important;
+            border-right: 1px solid black !important;
+        }
+        .total-amount {
+            border-top: 1px solid black !important;
+            border-bottom: 1px solid black !important;
+            border-left: 1px solid black !important;
+            border-right: 1px solid black !important;
+        }
+        .tax-table th {
+            color: #000;
+        }
+        .terms-page {
+            margin-top: 10px;
+            width: 100%;
+            page-break-inside: avoid;
+        }
+        .terms-table {
+            width: 100%;
+            border: 1px solid #000;
+            border-collapse: collapse;
+            page-break-inside: avoid;
+        }
+        .terms-table td {
+            border: 1px solid #000;
+        }
+        .terms-list {
+            padding-left: 20px;
+        }
+        .page-footer {
+            text-align: center;
+            padding: 0px 0;
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        .truncate-4-lines {
+            max-height: 52px !important;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+        .avoid-break {
+            page-break-inside: avoid;
+        }
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
+        .tax-table {
+            page-break-inside: avoid;
+        }
+        
+        @media print {
+            .footer-section {
+                position: fixed;
+                bottom: 0;
+            }
+            .content-section {
+                margin-bottom: 55mm;
+            }
+            body, .content-section {
+                margin-top: 0;
+                padding-top: 0;
+            }
+            .tax-table {
+                page-break-inside: avoid;
+            }
+        }
+        
+        @page {
+            margin-top: 2mm;
+            margin-bottom: -13mm;
+            margin-left: 5mm;
+            margin-right: 5mm;
+            @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 8px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .responsive-table {
+                max-height: 400px;
+                overflow-y: auto;
+                border: 1px solid #ccc;
+                display: block;
+            }
+            .responsive-table table {
+                table-layout: auto !important;
+                width: auto !important;
+            }
+        }
+        
+        @media print {
+            .responsive-table {
+                max-height: unset !important;
+                overflow: visible !important;
+                border: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Section -->
+    <div class="header-section">
+        <h3 style="text-align: center; font-weight: bold;">SALES INVOICE</h3>
+        
+        <!-- IRN and QR Code Section -->
+        {% if doc.irn %}
+            {% set e_invoice_log = frappe.db.get_value("e-Invoice Log", doc.irn, ("invoice_data", "signed_qr_code"), as_dict=True) %}
+            {% if e_invoice_log %}
+                {% set invoice_data = json.loads(e_invoice_log.invoice_data) %}
+                {% set date_format = frappe.db.get_single_value("System Settings", 'date_format').replace("mm", "MM") %}
+                <table style="width: 100%; margin-bottom: 2px;">
+                    <tr>
+                        <td style="vertical-align: top;">
+                            <strong>IRN:</strong> {{ doc.irn }}<br>
+                            <strong>Ack No:</strong> {{ invoice_data.get("AckNo") if invoice_data.get("AckNo") else '' }}<br>
+                            <strong>Ack Date:</strong> {{ frappe.utils.format_datetime(invoice_data.get("AckDt"), date_format) if invoice_data.get("AckDt") else '' }}
+                        </td>
+                        <td style="text-align: right; vertical-align: top; width: 100px;">
+                            {% if e_invoice_log.signed_qr_code and e_invoice_log.signed_qr_code.strip() %}
+                                {{ web_block('e-Invoice QR', values={'e_invoice_qr_text': e_invoice_log.signed_qr_code }) }}
+                            {% else %}
+                                <img src="https://srinathcollective-backoffice.storenxt.in/files/qr_code.png" alt="QR Code" style="width: 100px; height: 100px;">
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            {% endif %}
+        {% endif %}
+
+        <!-- Header Details -->
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <!-- Logo and Company Details -->
+                <td style="border: 1px solid #000; padding: 8px; vertical-align: top; width: 50%;">
+                    <table>
+                        <tr>
+                            <td style="vertical-align: top; width: 100px;">
+                                {% set company_name = frappe.db.get_single_value("Global Defaults", "default_company") %}
+                                {% if company_name %}
+                                    {% set company = frappe.get_doc("Company", company_name) %}
+                                    {% if company.logo_for_printing %}
+                                        <img src="{{ frappe.utils.get_url(company.logo_for_printing) }}" alt="Company Logo" width="100px" height="100px">
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td style="vertical-align: top; padding-left: 10px;">
+                                <strong>SRINATH SANITARYWARES</strong><br>
+                                #1010, Srinath Mansion, Dr. Rajkumar Road, Rajajinagar<br>
+                                Bangalore, Karnataka - 560010<br>
+                                8023303393, 8023303394<br>
+                                <strong>Email: </strong>quote@srinathcollective.com, care@srinathcollective.com<br>
+                                <strong>GSTIN: </strong>29AAIFS5015M1ZS<br>
+                                <strong>PAN: </strong>AAIFS5015M<br>
+                                <strong>WEBSITE: </strong>www.srinathcollective.com
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+                
+                <!-- Invoice Details -->
+                <td style="border: 1px solid #000; vertical-align: top; width: 25%;">
+                    <p class="invoice"><strong>Invoice No. & Date: </strong> {{ doc.name }} , {{ doc.posting_date }}</p>
+                    {% set ns = namespace(sales_order='', sales_order_date='') %}
+                    {% for item in doc.items %}
+                        {% if not ns.sales_order and item.sales_order %}
+                            {% set ns.sales_order = item.sales_order %}
+                            {% set raw_date = frappe.db.get_value("Sales Order", item.sales_order, "transaction_date") %}
+                            {% set ns.sales_order_date = frappe.utils.formatdate(raw_date, "dd-mm-yyyy") %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if ns.sales_order %}
+                        <p class="invoice">
+                            <strong>Order No. & Date: </strong>
+                            {{ ns.sales_order }} {{ ns.sales_order_date }}
+                        </p>
+                    {% else %}
+                        <p class="invoice"><strong>Order No. & Date: </strong> Not Linked</p>
+                    {% endif %}
+                    <p class="invoice"><strong>PO No. & Date:</strong> {{ doc.po_no }} & {{ doc.po_date }}</p>
+                    <p class="invoice"><strong>Reference:</strong> {{ doc.source }}</p>
+                </td>
+                
+                <!-- Sales Consultant & Transport Details -->
+                <td style="border: 1px solid #000; padding: 8px; vertical-align: top; width: 25%;">
+                    <p class="invoice"><strong>E-Way No.:</strong> {{ doc.ewaybill or " " }}</p>
+                    <p class="invoice">
+                        <strong>Sales Consultant:</strong>
+                        {% if doc.sales_team and doc.sales_team[0].sales_person %}
+                            {{ doc.sales_team[0].sales_person }}
+                            {{ frappe.db.get_value("Sales Person", doc.sales_team[0].sales_person, "custom_employee_phone_number") or '.' }}
+                        {% else %}
+                            .
+                        {% endif %}
+                    </p>
+                    <p class="invoice"><strong>Payment Mode:</strong> </p>
+                    <p class="invoice"><strong>Vehicle No.:</strong> {{ doc.vehicle_no or 'N/A'}}</p>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="4" style="border: 1px solid #000; padding: 10px; text-align: left;">
+                    <strong>Remarks: </strong> {{ doc.remarks }}
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="border: 1px solid #000; padding: 8px; vertical-align: top;">
+                    <strong>Billed To:</strong><br>
+                    {{ doc.customer_name }}<br>
+                    {{ doc.address_display }} M- {{ doc.contact_mobile }}<br>
+                    {% set customer = frappe.get_doc("Customer", doc.customer) %}
+                    <p><strong>GSTIN No.:</strong> {{ customer.gstin or 'N/A' }}</p>
+                </td>
+                <td colspan="2" style="border: 1px solid #000; padding: 8px; vertical-align: top;">
+                    <strong>Delivery (Shipped To):</strong><br>
+                    {{ doc.shipping_address }} M- {{ doc.contact_mobile }}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Main Content Section -->
+    <div class="content-section">
+        {% set first_chunk_size = 5 %}
+        {% set later_chunk_size = 12 %}
+        {% set ns = namespace(total_qty=0, total_amount=0, item_counter=1) %}
+        
+        {# First Page #}
+        {% set items = doc.items %}
+        <div class="responsive-table content-block">
+            <table class="main-table" style="width: 100%; line-height: 10px;">
+                <colgroup>
+                    <col style="width: 5%;">
+                    <col style="width: 9%;">
+                    <col style="width: 20%;">
+                    <col style="width: 7%;">
+                    <col style="width: 7%;">
+                    <col style="width: 10%;">
+                    <col style="width: 6%;">
+                    <col style="width: 10%;">
+                    <col style="width: 7%;">
+                    <col style="width: 10%;">
+                    <col style="width: 10%;">
+                </colgroup>
+                <thead>
+                    <tr style="background-color: #fff; color: #000 !important; line-height: 0.9; font-weight: bold; font-size: 12px;">
+                        <th class="text-left" style="color: #000 !important;"><strong>SN</strong></th>
+                        <th class="text-left" style="color: #000 !important;"><strong>Item Code</strong></th>
+                        <th class="text-left" style="color: #000 !important;"><strong>Item Name</strong></th>
+                        <th class="text-center" style="word-wrap: break-word; white-space: normal; color: #000 !important;"><strong>Color</strong></th>
+                        <th class="text-center" style="color: #000 !important;"><strong>Size</strong></th>
+                        <th class="text-center" style="color: #000 !important;"><strong>HSN</strong></th>
+                        <th class="text-center" style="color: #000 !important;"><strong>Qty</strong></th>
+                        <th class="text-right" style="color: #000 !important;"><strong>Rate (₹)</strong></th>
+                        <th class="text-right" style="color: #000 !important;"><strong>Disc%</strong></th>
+                        <th class="text-center" style="word-wrap: break-word; white-space: normal; color: #000 !important;"><strong>Disc.Rate/pcs</strong></th>
+                        <th class="text-right" style="color: #000 !important;"><strong>Amount</strong></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items[:first_chunk_size] %}
+                    <tr style="font-size: 12px;">
+                        <td class="text-left">{{ ns.item_counter }}</td>
+                        <td class="text-left">{{ item.item_code }}</td>
+                        <td class="text-left" style="font-size: 10px; word-wrap: break-word; white-space: normal;">{{ item.item_name }}</td>
+
+                        <td class="text-center">{{ frappe.db.get_value('Item', item.item_code, 'custom_colour') or ' ' }}</td>
+                        <td style="border: 1px solid #000; padding: 5px; word-wrap: break-word; white-space: normal;">
+                            {% set custom_size_val = frappe.db.get_value('Item', item.item_code, 'custom_size') %}
+                            {% if custom_size_val %}
+                                {{ custom_size_val }}
+                            {% else %}
+                                {% set length = frappe.db.get_value('Item', item.item_code, 'custom_length_mm') %}
+                                {% set breadth = frappe.db.get_value('Item', item.item_code, 'custom_breadh_mm') %}
+                                {% if length and breadth %}
+                                    {{ length }} × {{ breadth }}
+                                {% elif length %}
+                                    {{ length }}
+                                {% elif breadth %}
+                                    {{ breadth }}
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ item.gst_hsn_code or 'N/A' }}</td>
+                        <td class="text-center">{{ item.qty|int }} {{ item.uom }}</td>
+                        <td class="text-right">
+                            {% set tax_rate = (item.cgst_rate or 0) + (item.sgst_rate or 0) + (item.igst_rate or 0) %}
+                            {% set inclusive_rate = item.price_list_rate * (1 + (tax_rate / 100)) %}
+                            {{ inclusive_rate | round(2) }}
+                        </td>
+                        <td style="border: 1px solid #000; padding: 5px; text-align: right;">
+                            {% set tax_rate = (item.cgst_rate or 0) + (item.sgst_rate or 0) + (item.igst_rate or 0) %}
+                            {% set gross_discount_percent = 100 - ((100 - (item.discount_percentage or 0)) / (1 + (tax_rate / 100))) %}
+                            {{ "%.2f"|format(gross_discount_percent) }}
+                        </td>
+                        <td class="text-center">{{ (item.net_amount / item.qty) | round(2) if item.qty else 0 }}</td>
+                        <td class="text-right">{{ item.net_amount }}</td>
+                    </tr>
+                    {% set ns.total_qty = ns.total_qty + (item.qty or 0) %}
+                    {% set ns.total_amount = ns.total_amount + (item.net_amount or 0) %}
+                    {% set ns.item_counter = ns.item_counter + 1 %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% set remaining_items = items[first_chunk_size:] %}
+        {# Remaining Pages #}
+        {% for i in range(0, remaining_items|length, later_chunk_size) %}
+            <div class="page-break"></div>
+            <div class="responsive-table content-block">
+                <table class="main-table" style="width: 100%; line-height: 13px;">
+                    <colgroup>
+                        <col style="width: 5%;">
+                        <col style="width: 9%;">
+                        <col style="width: 20%;">
+                        <col style="width: 7%;">
+                        <col style="width: 7%;">
+                        <col style="width: 10%;">
+                        <col style="width: 6%;">
+                        <col style="width: 10%;">
+                        <col style="width: 7%;">
+                        <col style="width: 10%;">
+                        <col style="width: 10%;">
+                    </colgroup>
+                    <thead>
+                        <tr style="background-color: #fff; color: #000 !important; line-height: 0.9; font-weight: bold; font-size: 12px;">
+                            <th class="text-left" style="color: #000 !important;"><strong>SN</strong></th>
+                            <th class="text-left" style="color: #000 !important;"><strong>Item Code</strong></th>
+                            <th class="text-left" style="color: #000 !important;"><strong>Item Name</strong></th>
+                            <th class="text-center" style="word-wrap: break-word; white-space: normal; color: #000 !important;"><strong>Color</strong></th>
+                            <th class="text-center" style="color: #000 !important;"><strong>Size</strong></th>
+                            <th class="text-center" style="color: #000 !important;"><strong>HSN</strong></th>
+                            <th class="text-center" style="color: #000 !important;"><strong>Qty</strong></th>
+                            <th class="text-right" style="color: #000 !important;"><strong>Rate (₹)</strong></th>
+                            <th class="text-right" style="color: #000 !important;"><strong>Disc%</strong></th>
+                            <th class="text-center" style="word-wrap: break-word; white-space: normal; color: #000 !important;"><strong>Disc.Rate/pcs</strong></th>
+                            <th class="text-right" style="color: #000 !important;"><strong>Amount</strong></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in remaining_items[i:i + later_chunk_size] %}
+                        <tr style="font-size: 12px;">
+                            <td class="text-left">{{ ns.item_counter }}</td>
+                            <td class="text-left">{{ item.item_code }}</td>
+                            <td class="text-left" style="font-size: 10px; word-wrap: break-word; white-space: normal;">{{ item.item_name }}</td>
+
+                            <td class="text-center">{{ frappe.db.get_value('Item', item.item_code, 'custom_colour') or ' ' }}</td>
+                            <td style="border: 1px solid #000; padding: 5px; word-wrap: break-word; white-space: normal;">
+                                {% set custom_size_val = frappe.db.get_value('Item', item.item_code, 'custom_size') %}
+                                {% if custom_size_val %}
+                                    {{ custom_size_val }}
+                                {% else %}
+                                    {% set length = frappe.db.get_value('Item', item.item_code, 'custom_length_mm') %}
+                                    {% set breadth = frappe.db.get_value('Item', item.item_code, 'custom_breadh_mm') %}
+                                    {% if length and breadth %}
+                                        {{ length }} × {{ breadth }}
+                                    {% elif length %}
+                                        {{ length }}
+                                    {% elif breadth %}
+                                        {{ breadth }}
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ item.gst_hsn_code or 'N/A' }}</td>
+                            <td class="text-center">{{ item.qty|int }} {{ item.uom }}</td>
+                            <td class="text-right">
+                                {% set tax_rate = (item.cgst_rate or 0) + (item.sgst_rate or 0) + (item.igst_rate or 0) %}
+                                {% set inclusive_rate = item.price_list_rate * (1 + (tax_rate / 100)) %}
+                                {{ inclusive_rate | round(2) }}
+                            </td>
+                            <td style="border: 1px solid #000; padding: 5px; text-align: right;">
+                                {% set tax_rate = (item.cgst_rate or 0) + (item.sgst_rate or 0) + (item.igst_rate or 0) %}
+                                {% set gross_discount_percent = 100 - ((100 - (item.discount_percentage or 0)) / (1 + (tax_rate / 100))) %}
+                                {{ "%.2f"|format(gross_discount_percent) }}
+                            </td>
+                            <td class="text-center">{{ (item.net_amount / item.qty) | round(2) if item.qty else 0 }}</td>
+                            <td class="text-right">{{ item.net_amount }}</td>
+                        </tr>
+                        {% set ns.total_qty = ns.total_qty + (item.qty or 0) %}
+                        {% set ns.total_amount = ns.total_amount + (item.net_amount or 0) %}
+                        {% set ns.item_counter = ns.item_counter + 1 %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endfor %}
+
+        {# Final total row #}
+        <table style="width: 100%; line-height: 2px;">
+            <colgroup>
+                <col style="width: 5%;">
+                <col style="width: 9%;">
+                <col style="width: 20%;">
+                <col style="width: 7%;">
+                <col style="width: 7%;">
+                <col style="width: 10%;">
+                <col style="width: 6%;">
+                <col style="width: 10%;">
+                <col style="width: 7%;">
+                <col style="width: 10%;">
+                <col style="width: 10%;">
+            </colgroup>
+            <tr style="font-weight: bold; background-color: #fff; border: 1px solid #000">
+                <td colspan="5" class="text-right">Total</td>
+                <td></td>
+                <td class="text-center" style="border: 1px solid #000;">{{ ns.total_qty }}</td>
+                <td class="text-right">{{ "%.2f"|format(ns.total_amount) }}</td>
+            </tr>
+        </table>
+
+        <!-- Only add page break if more than 3 items -->
+        {% if items|length > 1 %}
+            <div class="page-break"></div>
+        {% endif %}
+
+        <!--Tax & GST Section - Wrapped in avoid-break-->
+        <div class="avoid-break">
+            {# Step 1: Initialize namespace at the top #}
+            {% set ns = namespace(
+                total_taxable=0,
+                total_cgst=0,
+                total_sgst=0,
+                total_igst=0,
+                hsn_summary={},
+                show_igst=False
+            ) %}
+
+        {# Step 2: Build HSN Summary and detect IGST #}
+        {% for item in doc.items %}
+            {% set hsn_code = item.gst_hsn_code or 'N/A' %}
+            {% set taxable_value = item.net_amount if item.net_amount else item.amount %}
+            {% set cgst_amount = item.cgst_amount or 0 %}
+            {% set sgst_amount = item.sgst_amount or 0 %}
+            {% set igst_amount = item.igst_amount or 0 %}
+            {% set cgst_rate = item.cgst_rate or 0 %}
+            {% set sgst_rate = item.sgst_rate or 0 %}
+            {% set igst_rate = item.igst_rate or 0 %}
+        
+            {% if igst_rate > 0 or igst_amount > 0 %}
+                {% set ns.has_igst = True %}
+            {% endif %}
+        
+            {% if ns.hsn_summary.get(hsn_code) %}
+                {% set existing = ns.hsn_summary[hsn_code] %}
+                {% set ns.hsn_summary = ns.hsn_summary.update({
+                    hsn_code: {
+                        'taxable_value': existing.taxable_value + taxable_value,
+                        'cgst_amount': existing.cgst_amount + cgst_amount,
+                        'sgst_amount': existing.sgst_amount + sgst_amount,
+                        'igst_amount': existing.igst_amount + igst_amount,
+                        'cgst_rate': cgst_rate,
+                        'sgst_rate': sgst_rate,
+                        'igst_rate': igst_rate
+                    }
+                }) or ns.hsn_summary %}
+            {% else %}
+                {% set ns.hsn_summary = ns.hsn_summary.update({
+                    hsn_code: {
+                        'taxable_value': taxable_value,
+                        'cgst_amount': cgst_amount,
+                        'sgst_amount': sgst_amount,
+                        'igst_amount': igst_amount,
+                        'cgst_rate': cgst_rate,
+                        'sgst_rate': sgst_rate,
+                        'igst_rate': igst_rate
+                    }
+                }) or ns.hsn_summary %}
+            {% endif %}
+        {% endfor %}
+        
+        {# Step 3: Side-by-side tables using float layout #}
+        <div style="margin-top: 10px;">
+            {# HSN Tax Summary Table (Left) - Dynamic based on tax type #}
+            {% if ns.has_igst %}
+                <!-- IGST Table (when IGST is present in taxes) -->
+                <table style="width: 70%; float: left; line-height: 1px; border-collapse: collapse; border-style: hidden !important; border-top: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+                    <thead>
+                        <tr>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">HSN/SAC</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">TAXABLE VALUE</th>
+                            <th colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">INTEGRATED TAX</th>
+                        </tr>
+                        <tr>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important;"></th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important;"></th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">RATE (%)</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">AMOUNT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for hsn_code, values in ns.hsn_summary.items() %}
+                            {% set ns.total_taxable = ns.total_taxable + values.taxable_value %}
+                            {% set ns.total_igst = ns.total_igst + values.igst_amount %}
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center;">{{ hsn_code }}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(values.taxable_value) }}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ values.igst_rate }}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(values.igst_amount) }}</td>
+                            </tr>
+                        {% endfor %}
+                        <tr style="font-weight: bold;">
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center;">Total</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(ns.total_taxable) }}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;"></td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(ns.total_igst) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            {% else %}
+                <!-- CGST + SGST Table (when CGST/SGST are present in taxes) -->
+                <table style="width: 70%; float: left; line-height: 1px; border-collapse: collapse; border-style: hidden !important; border-top: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+                    <thead>
+                        <tr>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">HSN/SAC</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">TAXABLE VALUE</th>
+                            <th colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">CENTRAL TAX</th>
+                            <th colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">STATE TAX</th>
+                        </tr>
+                        <tr>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important;"></th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important;"></th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">RATE (%)</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">AMOUNT</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">RATE (%)</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center; color: #000 !important; font-weight: bold;">AMOUNT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for hsn_code, values in ns.hsn_summary.items() %}
+                            {% set ns.total_taxable = ns.total_taxable + values.taxable_value %}
+                            {% set ns.total_cgst = ns.total_cgst + values.cgst_amount %}
+                            {% set ns.total_sgst = ns.total_sgst + values.sgst_amount %}
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center;">{{ hsn_code }}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(values.taxable_value) }}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ values.cgst_rate }}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(values.cgst_amount) }}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ values.sgst_rate }}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(values.sgst_amount) }}</td>
+                            </tr>
+                        {% endfor %}
+                        <tr style="font-weight: bold;">
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center;">Total</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(ns.total_taxable) }}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;"></td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(ns.total_cgst) }}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;"></td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(ns.total_sgst) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            {% endif %}
+        
+            {# Total Summary Table (Right) #}
+            <table style="width: 30%; float: right; line-height: 1px; border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-top: 1px solid black !important; border-right: 1px solid black !important;">
+                <tr>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: left;">Total Amount:</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(doc.grand_total) }}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: left;">Round Off:</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right;">{{ "%.2f"|format(doc.rounding_adjustment) }}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: left; font-weight: bold;">Final Amount:</td>
+                    <td style="border: 1px solid #000; padding: 8px; text-align: right; font-weight: bold;">{{ "%.2f"|format(doc.rounded_total) }}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div style="clear: both;"></div>
+        </div>
+
+        <!-- Amount in Words Section - Wrapped in avoid-break -->
+        <div class="avoid-break" style="margin-top: 10px;">
+            <table class="amount_in_words">
+                <tr>
+                    <td style="font-size: 10px; font-weight: bold; border: 1px solid #000; padding: 8px;">
+                        Amount Chargeable (in words): {{ doc.in_words }} <br>
+                        Tax Amount (in words): {{ money_in_words(ns.total_tax_amount or 0) }}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="font-size: 10px; border: 1px solid #000; padding: 8px;">
+                        <b>Bank Details:</b>SRINATH SANITARY WARES, Standard Chartered Bank, A/C No. 45205000313, Branch - SADASHIVANAGAR,Bangalore, IFSC Code: SCBL0036106
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Terms & Conditions Section - Wrapped in avoid-break -->
+        <div class="terms-page avoid-break">
+            <table class="terms-table">
+                <tr>
+                    <td>
+                        <ol class="terms-list">
+                            <li>Goods once sold cannot be taken back or exchanged.</li>
+                            <li>Please check the material before taking delivery.</li>
+                            <li>An interest of 24% P.A. will be charged for payment delayed more than 7 days.</li>
+                            <li>Subject to Bengaluru Jurisdiction.</li>
+                            <li>We cannot be held responsible for any shade or size variation in Tiles since we are only dealers. In case of any complaint, the matter should be taken up with the manufacturer directly.</li>
+                            <li>E&OE</li>
+                        </ol>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="text-center"> THIS IS A COMPUTER-GENERATED INVOICE </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Footer Section -->
+    <div class="footer-section">
+        <div class="page-footer">
+            <table style="width: 100%; text-align: center;">
+                <tr style="line-height: 5px;">
+                    <!-- Amount in Words (with border) -->
+                    <td colspan="3" style="width: 70%; text-align: left; border: 1px solid #000; padding: 3px; border-left: hidden !important; border-right: hidden !important;">
+                        <strong>Amount in Words:</strong> {{ doc.in_words }}
+                    </td>
+                    <!-- Grand Total Amount (with border) -->
+                    <td colspan="1" style="width: 30%; text-align: right; border: 1px solid #000; padding: 3px; border-left: hidden !important; border-right: hidden !important;">
+                        <strong>Amount: {{ doc.grand_total }}</strong>
+                    </td>
+                </tr>
+                <tr>
+                    <!-- Footer Signature without border -->
+                    <td colspan="4" style="text-align: right; font-weight: bold;">
+                        For SRINATH SANITARYWARES
+                    </td>
+                </tr>
+                <tr>
+                    <td style="height: 5px;"></td>
+                </tr>
+                <tr>
+                    <td style="width: 30%; text-align: left; vertical-align: top;">
+                        <strong>Customer's Signature:</strong><br>
+                        Invoice No. {{ doc.name }}
+                    </td>
+                    {% set get_fullname = frappe.get_fullname %}
+                    <td style="width: 30%; text-align: center; vertical-align: top;">
+                        <strong>Prepared By:</strong> {{ get_fullname(frappe.session.user) }}
+                    </td>
+                    <td style="width: 20%; text-align: center; vertical-align: top;">
+                        <strong>Checked By:</strong>
+                    </td>
+                    <td style="width: 20%; text-align: right; vertical-align: top;">
+                        <strong>Authorised Signatory</strong>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@media print {
+    @page {
+        size: A4;
+        margin: 20mm 10mm 20mm 10mm; /* balanced margins */
+    }
+
+    body {
+        margin: 0;
+    }
+
+    .footer {
+        page-break-before: avoid;
+        page-break-after: avoid;
+        page-break-inside: avoid;
+        font-size: 8px;
+        padding: 0px 0px;
+    }
+
+    .footer td {
+        padding: 3px;
+    }
+}
+
+.terms-page {
+    page-break-before: always;
+    margin-top: 20px;
+    width: 100%;
+}
+
+
+.terms-table {
+    width: 100%;
+    border: 1px solid #000;
+    border-collapse: collapse;
+}
+
+.terms-table td {
+    /*padding: 10px;*/
+    border: 1px solid #000;
+}
+
+.terms-list {
+    padding-left: 20px;
+}
+.amount_in_words{
+    border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;
+}
+.tax-table{
+    border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;
+}
+.total-amount{
+    border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;
+}
+.tax-table th{
+    color: #000;
+}
+
