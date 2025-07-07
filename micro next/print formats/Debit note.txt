@@ -1,0 +1,288 @@
+<style>
+    .debit-note { font-family: Arial, sans-serif; font-size: 12px;}
+    .header, .details, .items, .totals, .footer { width: 99.80%%; border-collapse: collapse; margin-bottom: 10px; }
+    .header td, .details td, .items th, .items td, .totals td { border: 1px solid #000; padding: 4px; }
+    .items th { background-color: #fff; color: #000;}
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .bold { font-weight: bold; }
+    /*.no-border td { border: none !important; }*/
+    /* Table Styling */
+table {
+    width: 99.80%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    color: #000;
+}
+
+/* Table Header Styling */
+table th, table td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+/* Terms & Conditions Section */
+table .terms-conditions {
+    padding: 15px;
+    background-color: #fff;
+    /*border-top: 2px solid #000;*/
+    /*border-bottom: 2px solid #000;*/
+    line-height: 1;
+}
+
+table .terms-conditions ol {
+    margin-left: 20px;
+    list-style-type: decimal;
+}
+
+table .terms-conditions strong {
+    font-size: 16px;
+    color: #000;
+}
+
+/* Prepared By and Authorized Signatory */
+table .prepared-signatory td {
+    padding: 20px;
+    /*text-align: center;*/
+    line-height: 1;
+}
+
+table .prepared-signatory td strong {
+    font-size: 14px;
+    color: #000;
+}
+
+table .prepared-signatory .signatory {
+    margin-top: 50px;
+    font-style: italic;
+}
+
+/* Right-aligned text */
+table .text-right {
+    text-align: right;
+}
+
+/* Optional for the whole table borders */
+table, table th, table td {
+    border: 1px solid #000;
+}
+.company-info{
+    line-height: 1;
+}
+#info{
+    line-height: 0.5;
+}
+.details{
+    line-height: 1;
+}
+.items th{
+    line-height: 0.5;
+}
+.items td{
+    line-height: 1;
+}
+.totals{
+    line-height: 0.7;
+}
+</style>
+
+<div class="debit-note">
+
+    <table class="header no-border" style="width: 100%;">
+    <tr>
+        <td style="width: 20%; vertical-align: middle;">
+            {% set company_name = frappe.db.get_single_value("Global Defaults", "default_company") %}
+            {% if company_name %}
+                {% set company = frappe.get_doc("Company", company_name) %}
+                {% if company.logo_for_printing %}
+                    <img src="{{ frappe.utils.get_url(company.logo_for_printing) }}" alt="Logo" class="logo" style="max-height: 120px;">
+                {% endif %}
+            {% endif %}
+        </td>
+        <td style="text-align: center; vertical-align: middle;" class="company-info">
+            <h3>{{ doc.company }}</h3>
+
+            {% set company_doc = frappe.get_doc("Company", doc.company) %}
+
+            {% set address_list = frappe.get_all(
+                "Address",
+                filters={"link_doctype": "Company", "link_name": doc.company},
+                fields=["name"],
+                limit=1
+            ) %}
+            {% if address_list %}
+                {% set address = frappe.get_doc("Address", address_list[0].name) %}
+                <p>{{ address.address_line1 or '' }} {{ address.address_line2 or '' }}<br>{{ address.city or '' }}, {{ address.state or '' }} {{ address.pincode or '' }}</p>
+            {% else %}
+                <p style="color:red;">No address found linked to Company</p>
+            {% endif %}
+
+            <p>{{ company_doc.phone_no or '' }}</p>
+            <p><strong>GSTIN:</strong> {{ company_doc.gstin or '' }}</p>
+        </td>
+        <td class="text-right" style="width: 120px;">
+            <!-- Right side content, if any -->
+        </td>
+    </tr>
+</table>
+
+
+
+
+<div class="text-center"><h4>Debit Note</h4></div>
+
+    <table class="details" id="info">
+        <tr>
+            <td>Document No.: {{ doc.name }}</td>
+            
+            <td>
+                Against Invoice / Bill of Supply No. :
+                {{ doc.return_against or " " }}
+            </td>
+        </tr>
+        <tr>
+            <td>Date of Issue: {{ doc.posting_date }}</td>
+            <td>Date of Invoice / Bill of Supply : {{ doc.custom_return_against_date or "" }}</td>
+        </tr>
+        <tr>
+            <td>State: {{ doc.place_of_supply }}</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Acl. No. : IRN {{ doc.irn or "Pending" }}</td>
+            <td> </td>
+        </tr>
+    </table>
+
+    <table class="details">
+        <tr>
+            <td class="bold text-center" style="line-height: 0.5;">Details of Receiver | Billed to</td>
+            <td class="bold text-center" style="line-height: 0.5;">Details of Consignee | Shipped to</td>
+        </tr>
+        {% set state_codes = {
+            "29": "Karnataka",
+            "27": "Maharashtra",
+            "33": "Tamil Nadu",
+            "11": "Delhi",
+            "06": "Haryana",
+            "08": "Rajasthan",
+            "36": "Chhattisgarh",
+            "05": "Uttarakhand",
+            "19": "West Bengal",
+            "12": "Goa"
+            
+        } %}
+        
+        <tr>
+            <td>
+                {{ doc.supplier_name }}<br>
+                {{ doc.billing_address_display or " " }}
+                GSTIN: {{ doc.supplier_gstin or " " }}<br>
+                State: 
+                {% if doc.supplier_gstin %}
+                    {% set state_code = doc.supplier_gstin[:2] %}
+                    {{ state_code }}-{{ state_codes.get(state_code, " ") }}
+                {% else %}
+                    {{ doc.supplier_state or " " }}
+                {% endif %}
+            </td>
+            <td>
+                {{ doc.shipping_address_name or doc.supplier_name }}<br>
+                {{ doc.shipping_address_display or " " }}
+                GSTIN: {{ doc.supplier_gstin or " " }}<br>
+                State: 
+                {% if doc.supplier_gstin %}
+                    {% set state_code = doc.supplier_gstin[:2] %}
+                    {{ state_code }}-{{ state_codes.get(state_code, " ") }}
+                {% else %}
+                    {{ doc.shipping_state or " " }}
+                {% endif %}
+            </td>
+        </tr>
+
+    </table>
+
+    <table class="items">
+        <thead>
+            <tr>
+                <th>SR</th>
+                <th>NAME OF PRODUCT/SERVICE</th>
+                <th>QTY</th>
+                <th>UOM</th>
+                <th>RATE</th>
+                <th>AMOUNT</th>
+                <th>TOTAL</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in doc.items %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.item_name }}</td>
+                <td class="text-right">{{ item.qty | abs }}</td>
+                <td class="text-center">{{ item.uom }}</td>
+                <td class="text-right">{{ item.rate }}</td>
+                <td class="text-right">{{ item.amount | abs }}</td>
+                <td class="text-right">{{ (item.net_amount or item.amount) | abs }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="totals">
+        <tr>
+            <td class="text-right bold" colspan="6">Total Amount Before Tax</td>
+            <td class="text-right">{{ doc.net_total | abs }}</td>
+        </tr>
+        {% for tax in doc.taxes %}
+        <tr>
+            <td class="text-right bold" colspan="5">{{ tax.account_head.split(" - ")[0] }}</td>
+            <td class="text-right">{{ tax.rate }}%</td>
+            {# <td class="text-right">Taxable: {{ tax.taxable_amount or 0 }}</td> #}
+            <td class="text-right">{{ tax.tax_amount | abs }}</td>
+        </tr>
+        {% endfor %}
+
+            <td class="text-right bold" colspan="6">Total</td>
+            <td class="text-right">{{ doc.grand_total | abs }}</td>
+        </tr>
+        <tr>
+            <td class="text-right bold" colspan="6">Round Off</td>
+            <td class="text-right">{{ doc.rounding_adjustment }}</td>
+        </tr>
+        <tr>
+            <td class="text-right bold" colspan="6">Total Amount After Tax</td>
+            <td class="text-right">{{ doc.rounded_total | abs }}</td>
+        </tr>
+        <tr>
+            <td class="bold" colspan="7">Amount Chargeable (in words): {{ doc.in_words }}</td>
+        </tr>
+    </table>
+
+   <table>
+    <tr class="terms-conditions">
+        <td colspan="3">
+            <p><strong>Terms & Conditions:</strong></p>
+            <ol>
+                <li>Goods once sold cannot be taken back.</li>
+                <li>Our risk & responsibility ceases once the goods leave our premises.</li>
+                <li>Interest @ 24% p.a. will be charged for the payment beyond 30 days.</li>
+            </ol>
+        </td>
+
+        
+        <td class="text-center" class="prepared-signatory">
+            <p style="font-size: 13px;">Certified that the particulars given above are true and correct.</p>
+            <strong>For {{ doc.company }}</strong><br><br><br><br><span class="signatory">Authorised Signatory</span>
+        </td>
+    </tr>
+    <tr>
+        <td style="border: none; line-height: 0.5;">
+            <strong>Prepared By:</strong> {{ doc.owner.split('@')[0] }}
+        </td>
+        <td style="border: none; line-height: 0.5;"></td>
+    </tr>
+</table>
+
+</div>

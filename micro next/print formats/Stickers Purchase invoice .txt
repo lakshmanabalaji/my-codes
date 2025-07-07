@@ -1,0 +1,17 @@
+{% for item in doc.items %}
+    {% for i in range(item.qty|int) %}
+        <div style="padding: 2px; width: 80mm; height: 30mm; display: table; font-family: Arial, sans-serif;">
+            <div style="display: table-cell; vertical-align: middle; padding-right: 5px; width: 30mm;">
+                <img src="{{ item.custom_qr_code }}" width="60mm" height="60mm"/>
+            </div>
+            <div style="display: table-cell; vertical-align: middle; width: 80mm;">
+                <strong style="display: block; font-size: 10px;">THE SRINATH COLLECTIVE</strong>
+                <strong style="font-size: 10px;">ID: {{ item.item_code }}</strong><br>
+                <span style="font-size: 9px;">{{ item.item_name }}</span>
+                <br> <strong style="font-size: 10px;">
+        Price: {{ frappe.db.get_value("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"}, "price_list_rate") or "N/A" }}
+                    </strong> 
+            </div>
+        </div>
+    {% endfor %}
+{% endfor %}

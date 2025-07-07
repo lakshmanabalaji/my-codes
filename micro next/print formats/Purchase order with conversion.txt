@@ -1,0 +1,247 @@
+{% if doc.docstatus == 0 %}
+<div style="
+    position: fixed;
+    top: 35%;
+    left: 25%;
+    font-size: 120px;
+    color:rgba(180, 180, 180, 0.5);
+    transform: rotate(-30deg);
+    z-index: 9999;
+    pointer-events: none;">
+    DRAFT
+</div>
+{% endif %}
+<style>
+    /* General Styling */
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 10px;
+    }
+    .header, .footer {
+        text-align: center;
+        font-weight: bold;
+    }
+    .table {
+        width: 99.50%;
+        border-collapse: collapse;
+        margin-top: 2px;
+        border: 1px solid black;
+        font-size: 9px;
+    }
+    .table th, .table td {
+        border: 1px solid black;
+        padding: 5px;
+        text-align: left;
+        vertical-align: top;
+    }
+    .right {
+        text-align: right;
+    }
+    .bold {
+        font-weight: bold;
+    }
+    .bordered {
+        border: 1px solid black;
+        padding: 10px;
+    }
+    .signature {
+        text-align: center;
+        font-weight: bold;
+        padding-top: 110px;
+    }
+    .title {
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+    }
+    .item-image {
+        width: 50px;
+        height: 50px;
+        object-fit: contain;
+        border: 1px solid black;
+    }
+    h4 {
+        color: #0A3D91;
+        text-decoration: underline;
+    }
+    .important-condition {
+        color: red;
+    }
+</style>
+
+<!-- Header -->
+<table width="100%">
+    <tr>
+        <!-- Left: Logo -->
+        <td style="width: 150px; text-align: left; vertical-align: middle;">
+            {% set company_name = frappe.db.get_single_value("Global Defaults", "default_company") %}
+            {% if company_name %}
+                {% set company = frappe.get_doc("Company", company_name) %}
+                {% if company.logo_for_printing %}
+                    <img src="{{ frappe.utils.get_url(company.logo_for_printing) }}" 
+                         alt="Company Logo" 
+                         style="width: 70px; height: 60px; display: block; max-width: 100%; height: auto;">
+                {% endif %}
+            {% endif %}
+        </td>
+        
+        <!-- Center: Title -->
+        <td style="text-align: center; vertical-align: middle;">
+            <h1 style="margin: 0; font-weight: bold;">Purchase Order</h1>
+        </td>
+        
+        <!-- Right: Empty space to balance alignment -->
+        <td style="width: 120px;"></td>
+    </tr>
+</table>
+
+<!-- Fetch Warehouse Details ONLY IF a Warehouse is Selected -->
+{% if doc.set_warehouse or doc.from_warehouse %}
+    {% set warehouse_details = frappe.db.get_value("Warehouse", doc.set_warehouse or doc.from_warehouse, 
+        ["warehouse_name", "address_line_1", "address_line_2", "city", "state", "pin"], as_dict=True) %}
+{% else %}
+    {% set warehouse_details = None %}
+{% endif %}
+
+<!-- Purchase Order Details Table -->
+<table class="table">
+    <tr>
+        <td colspan="2" class="bordered">
+            <p><strong>SRINATH SANITARYWARES</strong></p>
+            #1010, Srinath Mansion, Dr. Rajkumar Road,<br>
+            Rajajinagar, Bangalore - 560010<br>
+            +91-80-23303393 / +91-80-41285850<br>
+            <strong>GSTIN: 29AAIFS5015M1ZS</strong>
+        </td>
+        <td class="bordered">
+            <strong>PO No: </strong>{{ doc.name }}<br>
+        </td>
+        <td class="bordered">
+            <strong>Date: </strong>{{ frappe.utils.formatdate(doc.transaction_date, "dd MMM yyyy") }}<br>
+            <strong>Delivery Date: </strong>{{ frappe.utils.formatdate(doc.schedule_date, "dd MMM yyyy") }}<br>
+            <strong>Dispatch Through: </strong>
+        </td>
+    </tr>
+</table>
+
+<!-- Supplier and Delivery Info -->
+<table class="table">
+    <tr>
+        <td colspan="2" class="bordered">
+            <strong>Supplier Info:</strong><br>
+            {{doc.supplier_name}}<br>
+            {{ doc.address_display }}<br>
+            {{ doc.supplier_gstin or '-' }}
+        </td>
+        <td colspan="2" class="bordered">
+            <strong>Delivery Address:</strong><br>
+            {% if doc.set_warehouse %}
+                {% set address_list = frappe.get_all("Dynamic Link", 
+                    filters={"link_doctype": "Warehouse", "link_name": doc.set_warehouse, "parenttype": "Address"}, 
+                    fields=["parent"]) %}
+                {% if address_list %}
+                    {% set address = frappe.get_doc("Address", address_list[0].parent) %}
+                    {{ address.address_line1 }}<br>
+                    {% if address.address_line2 %}{{ address.address_line2 }}<br>{% endif %}
+                    {{ address.city }} - {{ address.pincode }}<br>
+                    {{ address.state }}<br>
+                    {{ address.country }}
+                {% else %}
+                    Address not available
+                {% endif %}
+            {% else %}
+                set_warehouse not selected
+            {% endif %}
+        </td>
+    </tr>
+</table>
+
+<!-- Items Table -->
+<table class="table">
+    <thead>
+        <tr>
+            <th style="color: #000;"><strong>SR NO.</strong></th>
+            <th style="color: #000;"><strong>DESCRIPTION OF GOODS</strong></th>
+            <th style="color: #000;"><strong>SIZE</strong></th>
+            <th style="color: #000;"><strong>HSN</strong></th>
+            <th style="color: #000;"><strong>IMAGE</strong></th>
+            <th style="color: #000;"><strong>QUANTITY</strong></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in doc.items %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>
+                {{ item.item_name }}
+                {% set supplier_part_no = frappe.db.get_value("Item Supplier", 
+                    {"parent": item.item_code, "supplier": doc.supplier}, "supplier_part_no") %}
+                {% if supplier_part_no %}
+                    ({{ supplier_part_no }})
+                {% endif %}
+            </td>
+            <td>{{ item.size or '' }}</td>
+            <td>{{ item.gst_hsn_code or 'N/A' }}</td>
+            <td>
+                {% if item.image %}
+                    <img src="{{ item.image }}" alt="Item Image" class="item-image">
+                {% else %}
+                    No Image
+                {% endif %}
+            </td>
+            <td>
+                {% if ( (item.custom_sqft is defined and item.custom_sqft and item.custom_sqft|float != item.qty|float) or 
+                      (item.custom_pcs is defined and item.custom_pcs and item.custom_pcs|float != item.qty|float) or 
+                      (item.custom_box is defined and item.custom_box and item.custom_box|float != item.qty|float) ) %}
+                    {{ item.custom_pcs|default(0)|int }} Pcs<br>
+                    {{ item.custom_box|default(0) }} Box<br>
+                    {{ item.custom_sqft|default(0) }} Sqft
+                {% else %}
+                    {{ item.qty|int }} {{ item.uom }}
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Terms & Conditions and Signature Section -->
+<table class="table">
+    <tr>
+        <td class="bordered" style="width: 70%; vertical-align: top;">
+            <p>Remarks: {{doc.custom_remarks}}</p>
+            <h4 style="text-decoration: underline;">Terms & Conditions:</h4>
+            <ul>
+                <li>Material should be sent as per order within committed prescribed delivery schedule in good condition.</li>
+                <li class="important-condition">Tiles ordered are first quality by default unless otherwise specified.</li>
+                <li>Please ensure that PO No. and name of the sales person who ordered the material is mentioned in the invoice.</li>
+                <li>In case of any dispute/difference, subject to Bangalore jurisdiction.</li>
+                <li>Entire ordered material should be sent in one batch.</li>
+                <li>Freight charges to be confirmed before sending the material from your Godown.</li>
+            </ul>
+            <p>Checked By: {{ doc.checked_by or ' ' }}</p>
+            <p>Prepared By: {{ doc.owner }}</p>
+        </td>
+        <td class="bordered" style="width: 30%; vertical-align: bottom; text-align: center;">
+            <p>For <strong>SRINATH SANITARYWARES</strong></p>
+            <br><br><br>
+            <p class="signature"><strong>Authorized Signatory</strong></p>
+        </td>
+    </tr>
+</table>
+
+
+
+
+
+
+
+
+
+
+table{
+    color: #000;
+}
+
+
+

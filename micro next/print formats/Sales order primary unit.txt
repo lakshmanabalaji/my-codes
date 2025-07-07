@@ -1,0 +1,371 @@
+{% if doc.docstatus == 0 %}
+<div style="
+    position: fixed;
+    top: 35%;
+    left: 25%;
+    font-size: 120px;
+    color:rgba(180, 180, 180, 0.5);
+    transform: rotate(-30deg);
+    z-index: 9999;
+    pointer-events: none;">
+    DRAFT
+</div>
+{% endif %}
+{% set currency_symbol = frappe.get_doc("Currency", doc.currency).symbol if doc.currency else "₹" %}
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 10px;
+        margin: 0;
+        padding: 0;
+    }
+    .header, .footer {
+        text-align: center;
+        font-weight: bold;
+    }
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid black;
+        font-size: 9px;
+    }
+    .table th, .table td {
+        border: 1px solid black;
+        padding: 2px !important;
+        text-align: left;
+    }
+    .right {
+        text-align: right;
+    }
+    .bold {
+        font-weight: bold;
+    }
+    .amount {
+        text-align: right;
+    }
+    .bordered {
+        border: 1px solid black;
+        padding: 10px;
+    }
+    .signature {
+        margin-top: 30px;
+        text-align: right;
+        font-weight: bold;
+    }
+    .item-image {
+        width: 50px;
+        height: 50px;
+        object-fit: contain;
+    }
+    .bordered-line {
+        border-bottom: 1px solid black;
+        width: 100%;
+        padding: 2px 0;
+        margin: 0;
+    }
+    .bordered-line:last-child {
+        border-bottom: none;
+    }
+    td {
+        padding: 2px !important;
+    }
+    table {
+        margin: 0;
+        padding: 0;
+        border-spacing: 0;
+    }
+    .header-container {
+        display: none;
+    }
+</style>
+
+<!-- Header with Logo and Title -->
+<table width="100%" style="margin-bottom: 0;">
+    <tr>
+        <td style="width: 150px; text-align: left; vertical-align: middle;">
+            {% set company_name = frappe.db.get_single_value("Global Defaults", "default_company") %}
+            {% if company_name %}
+                {% set company = frappe.get_doc("Company", company_name) %}
+                {% if company.logo_for_printing %}
+                    <img src="{{ frappe.utils.get_url(company.logo_for_printing) }}" alt="Company Logo" style="width: 60px; height: 50px; display: block; max-width: 100%; height: auto;">
+                {% endif %}
+            {% endif %}
+        </td>
+        <td style="text-align: center; vertical-align: middle;">
+            <h1 style="margin: 0; font-weight: bold;">Sales Order</h1>
+        </td>
+        <td style="width: 120px;"></td>
+    </tr>
+</table>
+
+<!-- Sales Order Details -->
+<table class="table">
+    <tr>
+        <td colspan="2" class="bordered">
+            <strong>SRINATH SANITARYWARES</strong><br>
+            #1010, Srinath Mansion, Dr. Rajkumar Road,<br>
+            Rajajinagar<br>
+            Bangalore Karnataka - 560010<br>
+            8023303393<br>
+            <strong>GSTIN: 29AAIFS5015M1ZS</strong>
+        </td>
+        <td class="bordered">
+            <div class="bordered-line"><strong>Sales Order No:</strong> {{ doc.name }}</div>
+            <div class="bordered-line"><strong>Sales Person Name:</strong> 
+                {% if doc.sales_team and doc.sales_team|length > 0 %}
+                    {{ doc.sales_team[0].sales_person }}
+                {% else %}
+                    
+                {% endif %}
+            </div>
+            <div class="bordered-line"><strong>PO No.:</strong> {{ doc.custom_customer_po }}</div>
+            <div class="bordered-line"><strong>Order Type:</strong> {{ doc.order_type or 'N/A' }}</div>
+        </td>
+        <td class="bordered">
+            <div class="bordered-line"><strong>Date:</strong> {{ frappe.utils.formatdate(doc.transaction_date, "dd MMM yyyy") }}</div>
+ {% set mobile = None %}
+{% if doc.sales_team and doc.sales_team[0].sales_person %}
+    {% set sp_doc = frappe.get_doc("Sales Person", doc.sales_team[0].sales_person) %}
+    {% if sp_doc.employee and frappe.db.exists("Employee", sp_doc.employee) %}
+        {% set emp = frappe.get_doc("Employee", sp_doc.employee) %}
+        {% if emp.user_id and frappe.db.exists("User", emp.user_id) %}
+            {% set user = frappe.get_doc("User", emp.user_id) %}
+            {% set mobile = user.mobile_no %}
+        {% endif %}
+    {% endif %}
+{% endif %}
+<div class="bordered-line"><strong>Mobile No.:</strong> {{ mobile or "" }}</div>
+
+
+            <div class="bordered-line"><strong>PO Date:</strong> {{ doc.po_date }}</div>
+            <div class="bordered-line"><strong>Reference:</strong> {{ doc.source or ""}}</div>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="bordered">
+            <strong>Buyer Info:</strong><br>
+            {{ doc.customer_name }}<br>
+            {{ doc.address_display or '-' }}
+            {{ doc.contact_mobile or '-' }}
+            {{ doc.billing_address_gstin }}
+        </td>
+        <td colspan="2" class="bordered">
+            <strong>Delivery Info:</strong><br>
+            {{ doc.shipping_address or '-' }}
+        </td>
+    </tr>
+</table>
+
+<!-- Items Table -->
+<table class="table">
+    <thead>
+        <tr>
+            <th>SR NO.</th>
+            <th>DESCRIPTION OF GOODS</th>
+            <th>BRAND</th>
+            <th>QUANTITY</th>
+            <th>RATE</th>
+            <th>DISCOUNT (%)</th>
+            <th class="amount">AMOUNT</th>
+            <th>IMAGE</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in doc.items %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.item_name }}</td>
+                <td>
+                    {% set brand = frappe.db.get_value('Item', item.item_code, 'brand') %}
+                    {{ frappe.db.get_value('Brand', brand, 'description') or '' }}
+                </td>
+                <td>{{ item.qty }} {{ item.uom }}</td>
+                <td style="border: 1px solid #000; padding: 5px; text-align: right;">
+                    {% set base_rate = frappe.db.get_value("Item Price", {"item_code": item.item_code, "price_list": "Standard Selling"}, "price_list_rate") or 0 %}
+                    {% set tax_percent = (item.igst_rate or 0) + (item.cgst_rate or 0) + (item.sgst_rate or 0) %}
+                    {% set rate_incl_tax = base_rate * (1 + (tax_percent / 100)) %}
+                    {{ "%.2f"|format(rate_incl_tax) }}
+                </td>
+                <td style="border: 1px solid #000; padding: 5px; text-align: right;">
+                    {% set tax_percent = (item.igst_rate or 0) + (item.cgst_rate or 0) + (item.sgst_rate or 0) %}
+                    {% set gross_discount_percent = 100 - ((100 - item.discount_percentage) / (1 + tax_percent / 100)) %}
+                    {{ "%.2f"|format(gross_discount_percent) }}
+                </td>
+                <td class="amount">{{ frappe.format(item.amount, "Currency") }}</td>
+                <td>
+                    {% if item.image %}
+                        <img src="{{ item.image }}" alt="Item Image" class="item-image">
+                    {% else %}
+                        No Image
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+
+
+<!-- Replace the existing Brand-Wise Discount Table with this: -->
+
+<!-- Brand-Wise Discount Table -->
+<table class="table">
+    <thead>
+        <tr>
+            <th>BRAND NAME</th>
+            <th>BRAND TOTAL AMOUNT</th>
+            <th>DISCOUNT %</th>
+            <th>DISCOUNT AMOUNT</th>
+            <th class="amount">TOTAL VALUE</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% set ns = namespace(overall_discount=0, total_amount=0) %}
+        
+        {% for item in doc.custom_dicount_table %}
+        <tr>
+            <!-- BRAND NAME -->
+            <td>
+                {{ item.brand }}
+            </td>
+            
+            <!-- BRAND TOTAL AMOUNT (Gross - Tax Inclusive) -->
+            <td class="amount">
+                {% set tax_rate = 18 %}  {# You may need to adjust this based on your tax logic #}
+                {% set gross_brand_total = (item.value or 0) * (1 + (tax_rate / 100)) %}
+                {{ currency_symbol }}{{ "%.2f"|format(gross_brand_total) }}
+            </td>
+            
+            <!-- DISCOUNT % - Gross Discount -->
+            <td class="amount">
+                {% set net_discount = item.disc_ or 0 %}
+                {% set tax_rate = 18 %}  {# You may need to adjust this based on your tax logic #}
+                {% set gross_discount = 100 - ((100 - net_discount) / (1 + (tax_rate / 100))) %}
+                {{ "%.2f"|format(gross_discount) }}%
+            </td>
+            
+            <!-- DISCOUNT AMOUNT (Gross - Tax Inclusive) -->
+            <td class="amount">
+                {% set tax_rate = 18 %}
+                {% set gross_discount_amount = (item.discount_amount or 0) * (1 + (tax_rate / 100)) %}
+                {{ currency_symbol }}{{ "%.2f"|format(gross_discount_amount) }}
+            </td>
+            
+            <!-- TOTAL VALUE (Gross - Tax Inclusive) -->
+            <td class="amount">
+                {% set tax_rate = 18 %}
+                {% set gross_total_value = (item.total_value or 0) * (1 + (tax_rate / 100)) %}
+                {{ currency_symbol }}{{ "%.2f"|format(gross_total_value) }}
+            </td>
+        </tr>
+        {# Update running totals with gross values #}
+        {% set tax_rate = 18 %}
+        {% set ns.overall_discount = ns.overall_discount + ((item.discount_amount or 0) * (1 + (tax_rate / 100))) %}
+        {% set ns.total_amount = ns.total_amount + ((item.total_value or 0) * (1 + (tax_rate / 100))) %}
+        {% endfor %}
+
+        <!-- Summary Row: Total Discount Amount (Gross) -->
+        <tr class="bold">
+            <td colspan="4" class="right">Total Discount:</td>
+            <td class="amount">{{ currency_symbol }}{{ "%.2f"|format(ns.overall_discount | float) }}</td>
+        </tr>
+        
+        <!-- Summary Row: Total Value (Keep as document's rounded_total since it's already gross) -->
+        <tr class="bold">
+            <td colspan="4" class="right">Total Value:</td>
+            <td class="amount">{{ currency_symbol }}{{ "%.2f"|format(doc.rounded_total) }}</td>
+        </tr>
+    </tbody>
+</table>
+
+
+<!-- Summary Table -->
+<table class="table">
+    <tr>
+        <td class="right bold">Total Boxes:</td>
+        <td class="amount"> #### </td>
+    </tr>
+    <tr>
+        <td class="right bold">Material Cost:</td>
+        <td class="amount">{{ frappe.format(doc.grand_total, "Currency") }}</td>
+    </tr>
+    <tr>
+        <td class="right bold">Round Off:</td>
+        <td class="amount">{{ frappe.format(doc.rounding_adjustment, "Currency") }}</td>
+    </tr>
+    <tr>
+        <td class="right bold">Grand Total:</td>
+        <td class="amount">{{ frappe.format(doc.rounded_total, "Currency") }}</td>
+    </tr>
+    <tr>
+        <td colspan="4" style="border: 1px solid #ccc; padding: 10px; text-align: left; background-color: #f1f1f1;">
+            <strong>Amount Chargeable (in words):</strong> {{ frappe.utils.money_in_words(doc.rounded_total) }}
+        </td>
+    </tr>
+</table>
+
+<!-- Bank Details -->
+<table class="table">
+    <tr>
+        <td class="bordered">
+            <p>
+                SRINATH SANITARY WARES: Bank: Standard Chartered Bank | IFSC: SCBL0036106<br>
+                A/c No: 45205000313 | Branch: SADASHIVANAGAR,Bangalore
+            </p>
+        </td>
+    </tr>
+</table>
+
+<!-- Terms & Conditions -->
+<div style="page-break-before: always;">
+    <table class="table" style="width: 100%;">
+        <tr>
+            <td style="width: 75%; vertical-align: top; border: none;">
+                <ol style="margin: 0; padding-left: 20px;">
+                    <li>Goods once sold cannot be taken back or exchanged.</li>
+                    <li>Please check the material before taking delivery.</li>
+                    <li>An interest of 24% P.A. will be charged for payment delayed more than 7 days.</li>
+                    <li>Subject to Bengaluru Jurisdiction.</li>
+                    <li>We cannot be held responsible for any shade or size variation in Tiles since we are only dealers. In case of any complaint, the matter should be taken up with the manufacturer directly.</li>
+                    <li>Please make a renewed effort to communicate the essence that <strong>No PO</strong> can come in name of <strong>The Srinath Collective</strong>.</li>
+                    <li>All the <strong>crossed cheques</strong> in name of <strong>Srinath Sanitarywares</strong>.</li>
+                    <li>E&OE</li>
+                </ol>
+            </td>
+            <td style="text-align: left; font-weight: bold; vertical-align: top; border: none;">
+                For <strong>SRINATH SANITARYWARES</strong><br><br><br><br><br><br><br><br><br><br><br>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding-top: 10px; border: none;">
+                <strong>Prepared By:</strong> {{ doc.owner }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <strong>Checked By:</strong> ___________________&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <strong>Authorized Signatory</strong>
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@page {
+        margin-top: 15mm;
+        margin-bottom: 15mm;
+        margin-left: 15mm;
+        margin-right: 15mm; /* Ensure there's enough space on the right */
+    }
+
+
+
