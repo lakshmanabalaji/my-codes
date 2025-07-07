@@ -1,0 +1,145 @@
+{% set company = frappe.get_doc("Company", doc.company) %}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .header { text-align: center; }
+        .header img { width: 300px;}
+        .company-details { text-align: center; font-size: 13px; margin-bottom: 10px; }
+        .title { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 2px; }
+        .table { width: 99.80%; border-collapse: collapse; margin-top: 2px; }
+        .table, .table th, .table td { border: 1px solid black; }
+        .table th, .table td { text-align: center; }
+        .subtotal { font-weight: bold; }
+        @media print {
+            body {
+                margin-top: 0;
+                padding-top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="{{ company.default_letter_head or '/private/files/SW LLP.png' }}" alt="Company Logo">
+    </div>
+    <div class="company-details">
+        {% if doc.company_address %}
+            {% set address = frappe.get_doc("Address", doc.company_address) %}
+            <strong>{{ address.address_line1 }}, </strong>
+            {% if address.address_line2 %}
+                <strong>{{ address.address_line2 }}</strong><br>
+            {% endif %}
+            <strong>{{ address.city }}, {{ address.state }} - {{ address.pincode }} {{ address.country }}</strong><br>
+        {% endif %}
+
+        {% if doc.company %}
+            {% set company = frappe.get_doc("Company", doc.company) %}
+            {% if company.gstin %}
+                <b>GSTIN:</b> {{ company.gstin }} |
+            {% endif %}
+            {% if company.pan %}
+                <b>PAN:</b> {{ company.pan }}<br>
+            {% endif %}
+            {% if company.phone_no %}
+                <b>Contact:</b> {{ company.phone_no }} |
+            {% endif %}
+            {% if company.email %}
+                <b></b> {{ company.email }} |
+            {% endif %}
+            {% if company.website %}
+                <b></b><a href="{{ company.website }}" target="_blank">{{ company.website }}</a>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="title" style="border: 1px solid #000">Packing Slip</div>
+
+    <table width="100%">
+        <tr>
+            <td><strong>Invoice No:</strong> {{ doc.name }}</td>
+            <td><strong>PO No:</strong> {{ doc.po_no or "N/A" }}</td>
+        </tr>
+        <tr>
+            <td><strong>Vehicle No:</strong> {{ doc.vehicle_no or "N/A" }}</td>
+            <td><strong>Date:</strong> {{ doc.posting_date }}</td>
+        </tr>
+    </table>
+
+    {% set grouped_items = {} %}
+
+    {% for item in doc.items %}
+        {% set length = frappe.db.get_value("Serial No", item.serial_no, "custom_length") or item.custom_length or 0 %}
+        {% set weight = item.custom_weight or 0 %}
+        {% set box_serial = item.serial_no or "N/A" %}
+        {% set item_group = item.item_code %}
+
+        {# Get UOM from Item master #}
+    {% set uom = frappe.db.get_value("Item", item.item_code, "sales_uom") %}
+    {% if not uom %}
+        {% set uom = frappe.db.get_value("Item", item.item_code, "stock_uom") or "N/A" %}
+    {% endif %}
+
+
+        {# Decide value based on UOM #}
+        {% if uom == "KG" %}
+            {% set value = weight %}
+        {% elif uom in ["Meter", "Mtr", "Length"] %}
+            {% set value = length %}
+        {% elif uom in ["Box", "Boxes", "Coil", "Coils"] %}
+            {% set value = frappe.db.get_value("Delivery Note Item", {"parent": doc.name, "item_code": item.item_code}, "qty") or 0 %}
+        {% else %}
+            {% set value = 0 %}
+        {% endif %}
+
+        {# Initialize group if not already exists #}
+        {% if item_group not in grouped_items %}
+            {% set _ = grouped_items.update({ item_group: [] }) %}
+        {% endif %}
+
+        {% set _ = grouped_items[item_group].append({
+            "item_code": item.item_code,
+            "size": frappe.db.get_value("Item", item.item_code, "custom_size_mm") or "-",
+            "box_serial": box_serial,
+            "uom": uom,
+            "value": value
+        }) %}
+    {% endfor %}
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Product Name</th>
+                <th>Size</th>
+                <th>Box Serial No</th>
+                <th>UOM</th>
+                <th>Values</th>
+            </tr>
+        </thead>
+        {% set ns = namespace(row_index=0, subtotal=0) %}
+        <tbody>
+            {% for group, items in grouped_items.items() %}
+                {% set ns.subtotal = 0 %}
+                {% for item in items %}
+                    {% set ns.row_index = ns.row_index + 1 %}
+                    {% set ns.subtotal = ns.subtotal + item.value %}
+                    <tr>
+                        <td>{{ ns.row_index }}</td>
+                        <td>{{ item.item_code }}</td>
+                        <td>{{ item.size }}</td>
+                        <td>{{ item.box_serial }}</td>
+                        <td>{{ item.uom }}</td>
+                        <td>{{ "%.3f"|format(item.value) }}</td>
+                    </tr>
+                {% endfor %}
+                <tr class="subtotal">
+                    <td colspan="5" style="text-align: right;">Total</td>
+                    <td>{{ "%.3f"|format(ns.subtotal) }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

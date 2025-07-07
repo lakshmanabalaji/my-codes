@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    @page {
+        margin-top: 2mm;
+        margin-bottom: 20mm;
+        margin-left: 15mm;
+        margin-right: 15mm; /* Ensure there's enough space on the right */
+        size: A4;
+    }
+    .copy-header {
+      height: 50mm; 
+      /*margin-bottom: 20mm;*/
+    }
+
+    body {
+        font-size: 12px;
+    }
+    
+    .page-break {
+        page-break-after: always;
+    }
+    
+    table {
+        width: 99.50%;
+        border-collapse: collapse;
+        font-size: 12px;
+        color: #000;
+    }
+    
+    th, td {
+        border: 1px solid black;
+        padding: 8px;
+        text-align: left;
+        box-sizing: border-box;
+    }
+    
+    .header-table {
+        width: 99.50%;
+        border: none;
+    }
+    
+    .header-table td {
+        padding: 5px;
+    }
+    
+    .invoice-title {
+        font-size: 15px;
+        font-weight: bold;
+        text-align: center;
+        border-bottom: 1px solid black; 
+        margin-bottom: 2px;
+    }
+    
+    .bold-text {
+        font-weight: bold;
+    }
+    
+    .text-right {
+        text-align: right;
+    }
+    
+    .text-center {
+        text-align: center;
+    }
+    
+    .text-left {
+        text-align: left;
+    }
+    
+    thead { 
+        display: table-header-group; 
+    }
+    
+    tfoot { 
+        display: table-row-group; 
+    }
+    tr {
+        page-break-inside: avoid;
+    }
+    
+    .items-table th {
+        text-align: center;
+    }
+    </style>
+</head>
+<body>
+
+<!-- FIRST COPY - ORIGINAL FOR RECIPIENT -->
+<div class="invoice-copy">
+    
+    <table style="width: 100%; margin-bottom: 10px; border: hidden !important">
+        <tr>
+            <td style="text-align: left; border: hidden !important">
+                {% if doc.ewaybill %}
+                    <strong>E-Waybill:</strong> {{ doc.ewaybill }}
+                {% endif %}
+            </td>
+            <td style="text-align: right; border: hidden !important">
+                <strong>Original for Buyer</strong>
+            </td>
+        </tr>
+    </table>
+    <div class="copy-header"></div>
+    <!-- Header Section -->
+    <table class="header-table">
+        <tr>
+            <td style="width: 35%; line-height: 1.2;">
+                <strong>Bill To:</strong><br>
+                <b>{{ doc.customer }}</b><br>
+                {% if doc.customer_address %}
+                    {% set billing_address = frappe.get_doc("Address", doc.customer_address) %}
+                    {{ billing_address.address_line1 }}<br>
+                    {% if billing_address.address_line2 %}{{ billing_address.address_line2 }}<br>{% endif %}
+                    {{ billing_address.city }}, {{ billing_address.state }} - {{ billing_address.pincode }}<br>
+                    GSTIN: {{ billing_address.gstin if billing_address.gstin else 'N/A' }}
+                {% endif %}
+            </td>
+
+            <td style="width: 35%; line-height: 1.2;">
+                {% if doc.shipping_address_name %}
+                    {% set shipping_address = frappe.get_doc("Address", doc.shipping_address_name) %}
+                    <strong>Ship To:</strong><br>
+                    <b>{{ shipping_address.address_title }}</b><br>
+                    {{ shipping_address.address_line1 }}<br>
+                    {% if shipping_address.address_line2 %}{{ shipping_address.address_line2 }}<br>{% endif %}
+                    {{ shipping_address.city }}, {{ shipping_address.state }} - {{ shipping_address.pincode }}<br>
+                    GSTIN: {{ shipping_address.gstin if shipping_address.gstin else 'N/A' }}
+                {% else %}
+                    <strong>Ship To:</strong><br>
+                    N/A
+                {% endif %}
+            </td>
+
+
+            <td class="text-left" style="width: 30%; line-height: 1.2;">
+                <div class="invoice-title">TAX INVOICE</div>
+                <strong>Invoice No:</strong> {{ doc.name }}<br>
+                <strong>Date:</strong> {{ frappe.utils.formatdate(doc.posting_date, "dd-mm-yyyy") }}<br>
+                <strong>Vehicle No:</strong> {{ doc.vehicle_no }}<br>
+                <strong>Carrier Name:</strong> {{ doc.custom_carrier_name }}<br>
+                <strong>Freight Term:</strong> {{ doc.custom_freight_term }}
+            </td>
+        </tr>
+    </table>
+
+    <!-- Item Table -->
+    {% set ns = namespace(total_weight=0, total_value=0) %}
+    <table class="items-table" style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <thead>
+            <tr>
+                <th style="text-align: center;">S/N</th>
+                <th style="text-align: center;">HSN</th>
+                <th style="text-align: center;">Description of Goods</th>
+                <th style="text-align: center;">Rate</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: center;">Unit</th>
+                <th style="text-align: center;">Disc(%)</th>
+                <th style="text-align: center;">Unit Price</th>
+                <th style="text-align: cneter">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in doc.items %}
+            <tr>
+                <td style="text-align: center;">{{ loop.index }}</td>
+                <td style="text-align: center;">{{ item.gst_hsn_code or " "}}</td>
+                <td style="text-align: center;">{{ item.description }}</td>
+                <td style="text-align: center;">{{ item.rate }}</td>
+                <td style="text-align: center;">
+                    {% set weight = item.custom_weight_in_kg|float %}
+                    {% set length = item.custom_length_in_meter|float %}
+                    
+                    {% set uom = (frappe.db.get_value("Item", item.item_code, "sales_uom") 
+                                  or frappe.db.get_value("Item", item.item_code, "stock_uom") 
+                                  or "N/A")|upper %}
+                
+                    {% if uom == "KG" %}
+                        {% set value = weight %}
+                    {% elif uom in ["METER", "MTR", "LENGTH"] %}
+                        {% set value = length %}
+                    {% elif uom in ["BOX", "BOXES", "COIL", "COILS"] %}
+                        {% set value = item.qty %}
+                    {% else %}
+                        {% set value = 0 %}
+                    {% endif %}
+                
+                    {{ "%.3f"|format(value) }}
+                </td>
+
+                
+                <td style="text-align: center;">
+                    {% set sales_uom = frappe.db.get_value("Item", item.item_code, "sales_uom") or item.uom %}
+                
+                    {% if sales_uom|lower == 'kg' %}
+                        Kg(s)
+                    {% elif sales_uom|lower == 'box' %}
+                        Box(s)
+                    {% elif sales_uom|lower == 'meter' %}
+                        Meter(s)
+                    {% else %}
+                        {{ sales_uom }}
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">0.00</td>
+                <td style="text-align: center;">{{ item.rate }}</td>
+                <td class="text-right" style='width:100px'>{{ "%.2f"|format(item.amount) }}</td>
+            </tr>
+            {% set ns.total_weight = ns.total_weight + (item.custom_weight_in_kg | float(0)) %}
+            {% set ns.total_value = ns.total_value + (item.amount | float(0)) %}
+            {% endfor %}
+    
+            <tr>
+                <td colspan="6">E&OE.</td>
+                <td colspan="2" class="text-right bold-text">Total Amount:</td>
+                <td class="text-right"><strong>₹{{ '%.2f'|format(ns.total_value) }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Summary -->
+    <table style="border-style: hidden !important; border-left: 1px solid black !important; border-right: 1px solid black !important; border-collapse: collapse;">
+        <tr>
+            <!-- Left Section (Invoice Details) -->
+            <td style="width: 50%; vertical-align: top; padding: 10px; border-right: 1px solid black;">
+                {% if doc.irn %}
+                    {% set e_invoice_log = frappe.db.get_value("e-Invoice Log", doc.irn, ("invoice_data", "signed_qr_code"), as_dict=True) %}
+                    {% if e_invoice_log %}
+                        {% set invoice_data = json.loads(e_invoice_log.invoice_data) %}
+                        {% set date_format = frappe.db.get_single_value("System Settings", 'date_format').replace("mm", "MM") %}
+            
+                        <div style="padding-top: 5px; display: flex; align-items: center; justify-content: flex-start; margin-left: 8px;">
+                            <!-- QR Code -->
+                            <div style="width: 120px; height: 120px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                                {{ web_block('e-Invoice QR', values={'e_invoice_qr_text': e_invoice_log.signed_qr_code }) }}
+                            </div>
+                            <!-- IRN Details -->
+                            <div style="max-width: 150px; word-wrap: break-word; font-size: 12px; margin-left: 15px;">
+                                <p><b>IRN:</b> <span style="word-break: break-word;">{{ doc.irn }}</span></p>
+                                <p><b>Ack No.:</b> {{ invoice_data.get("AckNo") or '' }}</p>
+                                <p><b>Ack Date:</b> {{ frappe.utils.format_datetime(invoice_data.get("AckDt"), date_format) if invoice_data.get("AckDt") else '' }}</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </td>
+
+            <!-- Right Section (Tax & Totals) -->
+            <td style="width: 50%; vertical-align: top; padding: 0px !important;">
+                <table style="width: 100%; border-style: hidden !important;">
+                    <tr>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                            Amount Before Tax:
+                        </td>
+                        <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                            ₹{{ doc.total }}
+                        </td>
+                    </tr>
+
+                    {% for tax in doc.taxes %}
+                        {% if "IGST" in tax.account_head %}
+                            <tr>
+                                <td class="text-right bold-text" style="padding: 5px;">IGST @ {{ tax.rate }}%:</td>
+                                <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                            </tr>
+                        {% elif "CGST" in tax.account_head %}
+                            <tr>
+                                <td class="text-right bold-text" style="padding: 5px;">CGST @ {{ tax.rate }}%:</td>
+                                <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                            </tr>
+                        {% elif "SGST" in tax.account_head %}
+                            <tr>
+                                <td class="text-right bold-text" style="padding: 5px;">SGST @ {{ tax.rate }}%:</td>
+                                <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% for tax in doc.taxes %}
+                        {% if "TCS" in tax.account_head %}
+                        <tr>
+                            <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                                TCS @ {{ tax.rate }}%:
+                            </td>
+                            <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                                ₹{{ "%.2f"|format(tax.tax_amount) }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% for tax in doc.taxes %}
+                        {% if "Rounded Off - S" in tax.account_head %}
+                        <tr>
+                            <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                                Round Off:
+                            </td>
+                            <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                                ₹{{ "%.2f"|format(tax.tax_amount) }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+
+                    <tr>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                           Rounded Total:
+                        </td>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                            ₹{{ "%.2f"|format(doc.outstanding_amount) }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+    
+     <!-- Amount in Words -->
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-top: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <tr>
+            <td><strong>IN WORDS: </strong> {{ doc.in_words.lower().replace("inr", "").replace(" and ", " ").replace(",", "").replace(" only", " rupees only").strip() }}</td>
+        </tr>
+    </table>
+
+    <!-- Bank Details -->
+    <table>
+        <tr>
+            <td>
+                <strong>Bank Details:</strong><br>
+                <b>Bank Name:</b> ICICI Bank, 
+                <b>Branch:</b> Trichy Road, Coimbatore,
+                <b>Account Number:</b> 001605021125, 
+                <b>IFSC Code:</b> ICIC0000016
+            </td>
+        </tr>
+    </table>
+
+    <!-- Terms and Conditions -->
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <tr>
+            <td style="width: 70%; vertical-align: top;">
+                <p style="font-size: 15px !important; font-weight: bold;">Terms & Conditions:</p>
+                <ol style=" font-size: 10px !important; margin-top: 5px; padding-left: 2px; list-style-position: inside;">
+                    <li>NO CLAIMS ARE ENTERTAINED UNLESS BROUGHT TO OUR NOTICE WITHIN TWO DAYS ON RECEIPT OF GOODS.</li>
+                    <li>GOODS ONCE SOLD WILL NOT BE TAKEN BACK.</li>
+                    <li>INTEREST @ 24% WILL BE CHARGED ON OVERDUE PAYMENT.</li>
+                    <li>WE ARE NOT RESPONSIBLE FOR BREAKAGE & DAMAGE IN TRANSIT.</li>
+                    <li>TRANSIT INSURANCE IF ANY IS TO BE TAKEN BY THE BUYER.</li>
+                    <li>ANY DISPUTES ARISING ARE SUBJECT TO COIMBATORE JURISDICTION.</li>
+                </ol>
+            </td>
+            <td style="width: 30%; text-align: center; font-size: 10px !important;">
+                <p><strong>For SONALI WIRES LLP</strong></p><br><br><br><br><br><br><br><br><br>
+                <p><strong>Authorized Signatory</strong></p>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- PAGE BREAK -->
+<div class="page-break"></div>
+
+<!-- SECOND COPY - DUPLICATE FOR TRANSPORTER -->
+<div class="invoice-copy">
+    
+    <table style="width: 100%; margin-bottom: 1px; border: hidden !important">
+        <tr>
+            <td style="text-align: left; border: hidden !important">
+                {% if doc.ewaybill %}
+                    <strong>E-Waybill:</strong> {{ doc.ewaybill }}
+                {% endif %}
+            </td>
+            <td style="text-align: right; border: hidden !important">
+                <strong>Duplicate for Transporter</strong>
+            </td>
+        </tr>
+    </table>
+    <div class="copy-header"></div>
+    <!-- Header Section -->
+    <table class="header-table">
+        <tr>
+            <td style="width: 35%; line-height: 1.2;">
+                <strong>Bill To:</strong><br>
+                <b>{{ doc.customer }}</b><br>
+                {% if doc.customer_address %}
+                    {% set billing_address = frappe.get_doc("Address", doc.customer_address) %}
+                    {{ billing_address.address_line1 }}<br>
+                    {% if billing_address.address_line2 %}{{ billing_address.address_line2 }}<br>{% endif %}
+                    {{ billing_address.city }}, {{ billing_address.state }} - {{ billing_address.pincode }}<br>
+                    GSTIN: {{ billing_address.gstin if billing_address.gstin else 'N/A' }}
+                {% endif %}
+            </td>
+
+            <td style="width: 35%; line-height: 1.2;">
+                {% if doc.shipping_address_name %}
+                    {% set shipping_address = frappe.get_doc("Address", doc.shipping_address_name) %}
+                    <strong>Ship To:</strong><br>
+                    <b>{{ shipping_address.address_title }}</b><br>
+                    {{ shipping_address.address_line1 }}<br>
+                    {% if shipping_address.address_line2 %}{{ shipping_address.address_line2 }}<br>{% endif %}
+                    {{ shipping_address.city }}, {{ shipping_address.state }} - {{ shipping_address.pincode }}<br>
+                    GSTIN: {{ shipping_address.gstin if shipping_address.gstin else 'N/A' }}
+                {% else %}
+                    <strong>Ship To:</strong><br>
+                    N/A
+                {% endif %}
+            </td>
+
+            <td class="text-left" style="width: 30%; line-height: 1.2;">
+                <div class="invoice-title">TAX INVOICE</div>
+                <strong>Invoice No:</strong> {{ doc.name }}<br>
+                <strong>Date:</strong> {{ frappe.utils.formatdate(doc.posting_date, "dd-mm-yyyy") }}<br>
+                <strong>Vehicle No:</strong> {{ doc.vehicle_no }}<br>
+                <strong>Carrier Name:</strong> {{ doc.custom_carrier_name }}<br>
+                <strong>Freight Term:</strong> {{ doc.custom_freight_term }}
+            </td>
+        </tr>
+    </table>
+
+    <!-- Item Table -->
+    {% set ns = namespace(total_weight=0, total_value=0) %}
+    <table class="items-table" style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <thead>
+            <tr>
+                <th style="text-align: center;">S/N</th>
+                <th style="text-align: center;">HSN</th>
+                <th style="text-align: center;">Description of Goods</th>
+                <th style="text-align: center;">Rate</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: center;">Unit</th>
+                <th style="text-align: center;">Disc(%)</th>
+                <th style="text-align: center;">Unit Price</th>
+                <th style="text-align: center">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in doc.items %}
+            <tr>
+                <td style="text-align: center;">{{ loop.index }}</td>
+                <td style="text-align: center;">{{ item.gst_hsn_code or " "}}</td>
+                <td style="text-align: center;">{{ item.description }}</td>
+                <td style="text-align: center;">{{ item.rate }}</td>
+
+                <td style="text-align: center;">
+                    {% set weight = item.custom_weight_in_kg|float %}
+                    {% set length = item.custom_length_in_meter|float %}
+                    
+                    {% set uom = (frappe.db.get_value("Item", item.item_code, "sales_uom") 
+                                  or frappe.db.get_value("Item", item.item_code, "stock_uom") 
+                                  or "N/A")|upper %}
+                
+                    {% if uom == "KG" %}
+                        {% set value = weight %}
+                    {% elif uom in ["METER", "MTR", "LENGTH"] %}
+                        {% set value = length %}
+                    {% elif uom in ["BOX", "BOXES", "COIL", "COILS"] %}
+                        {% set value = item.qty %}
+                    {% else %}
+                        {% set value = 0 %}
+                    {% endif %}
+                
+                    {{ "%.3f"|format(value) }}
+                </td>
+                
+                <td style="text-align: center;">
+                    {% set sales_uom = frappe.db.get_value("Item", item.item_code, "sales_uom") or item.uom %}
+                
+                    {% if sales_uom|lower == 'kg' %}
+                        Kg(s)
+                    {% elif sales_uom|lower == 'box' %}
+                        Box(s)
+                    {% elif sales_uom|lower == 'meter' %}
+                        Meter(s)
+                    {% else %}
+                        {{ sales_uom }}
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">0.00</td>
+                <td style="text-align: center;">{{ item.rate }}</td>
+                <td class="text-right" style='width:100px'>{{ "%.2f"|format(item.amount) }}</td>
+            </tr>
+            {% set ns.total_weight = ns.total_weight + (item.custom_weight_in_kg | float(0)) %}
+            {% set ns.total_value = ns.total_value + (item.amount | float(0)) %}
+            {% endfor %}
+    
+            <tr>
+                <td colspan="6">E&OE.</td>
+                <td colspan="2" class="text-right bold-text">Total Amount:</td>
+                <td class="text-right"><strong>₹{{ '%.2f'|format(ns.total_value) }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Summary -->
+    <table style="border-style: hidden !important; border-left: 1px solid black !important; border-right: 1px solid black !important; border-collapse: collapse;">
+        <tr>
+            <!-- Left Section (Invoice Details) -->
+            <td style="width: 50%; vertical-align: top; padding: 10px; border-right: 1px solid black;">
+                {% if doc.irn %}
+                    {% set e_invoice_log = frappe.db.get_value("e-Invoice Log", doc.irn, ("invoice_data", "signed_qr_code"), as_dict=True) %}
+                    {% if e_invoice_log %}
+                        {% set invoice_data = json.loads(e_invoice_log.invoice_data) %}
+                        {% set date_format = frappe.db.get_single_value("System Settings", 'date_format').replace("mm", "MM") %}
+            
+                        <div style="padding-top: 5px; display: flex; align-items: center; justify-content: flex-start; margin-left: 8px;">
+                            <!-- QR Code -->
+                            <div style="width: 120px; height: 120px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                                {{ web_block('e-Invoice QR', values={'e_invoice_qr_text': e_invoice_log.signed_qr_code }) }}
+                            </div>
+                            <!-- IRN Details -->
+                            <div style="max-width: 150px; word-wrap: break-word; font-size: 12px; margin-left: 15px;">
+                                <p><b>IRN:</b> <span style="word-break: break-word;">{{ doc.irn }}</span></p>
+                                <p><b>Ack No.:</b> {{ invoice_data.get("AckNo") or '' }}</p>
+                                <p><b>Ack Date:</b> {{ frappe.utils.format_datetime(invoice_data.get("AckDt"), date_format) if invoice_data.get("AckDt") else '' }}</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </td>
+
+            <!-- Right Section (Tax & Totals) -->
+            <td style="width: 50%; vertical-align: top; padding: 0px !important;">
+                <table style="width: 100%; border-style: hidden !important;">
+                    <tr>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                            Amount Before Tax:
+                        </td>
+                        <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                            ₹{{ doc.total }}
+                        </td>
+                    </tr>
+
+                    {% for tax in doc.taxes %}
+                        {% if "IGST" in tax.account_head %}
+                            <tr>
+                                <td class="text-right bold-text" style="padding: 5px;">IGST @ {{ tax.rate }}%:</td>
+                                <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                            </tr>
+                        {% elif "CGST" in tax.account_head %}
+                            <tr>
+                                <td class="text-right bold-text" style="padding: 5px;">CGST @ {{ tax.rate }}%:</td>
+                                <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                            </tr>
+                        {% elif "SGST" in tax.account_head %}
+                            <tr>
+                                <td class="text-right bold-text" style="padding: 5px;">SGST @ {{ tax.rate }}%:</td>
+                                <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% for tax in doc.taxes %}
+                        {% if "TCS" in tax.account_head %}
+                        <tr>
+                            <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                                TCS @ {{ tax.rate }}%:
+                            </td>
+                            <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                                ₹{{ "%.2f"|format(tax.tax_amount) }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% for tax in doc.taxes %}
+                        {% if "Rounded Off - S" in tax.account_head %}
+                        <tr>
+                            <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                                Round Off:
+                            </td>
+                            <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                                ₹{{ "%.2f"|format(tax.tax_amount) }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+
+                    <tr>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                           Rounded Total:
+                        </td>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                            ₹{{ "%.2f"|format(doc.outstanding_amount) }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+    
+    <!-- Amount in Words -->
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-top: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <tr>
+            <td><strong>IN WORDS: </strong> {{ doc.in_words.lower().replace("inr", "").replace(" and ", " ").replace(",", "").replace(" only", " rupees only").strip() }}</td>
+        </tr>
+    </table>
+
+    <!-- Bank Details -->
+    <table>
+        <tr>
+            <td>
+                <strong>Bank Details:</strong><br>
+                <b>Bank Name:</b> ICICI Bank, 
+                <b>Branch:</b> Trichy Road, Coimbatore,
+                <b>Account Number:</b> 001605021125, 
+                <b>IFSC Code:</b> ICIC0000016
+            </td>
+        </tr>
+    </table>
+
+    <!-- Terms and Conditions -->
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <tr>
+            <td style="width: 70%; vertical-align: top;">
+                <p style="font-size: 15px !important; font-weight: bold;">Terms & Conditions:</p>
+                <ol style=" font-size: 10px !important; margin-top: 5px; padding-left: 2px; list-style-position: inside;">
+                    <li>NO CLAIMS ARE ENTERTAINED UNLESS BROUGHT TO OUR NOTICE WITHIN TWO DAYS ON RECEIPT OF GOODS.</li>
+                    <li>GOODS ONCE SOLD WILL NOT BE TAKEN BACK.</li>
+                    <li>INTEREST @ 24% WILL BE CHARGED ON OVERDUE PAYMENT.</li>
+                    <li>WE ARE NOT RESPONSIBLE FOR BREAKAGE & DAMAGE IN TRANSIT.</li>
+                    <li>TRANSIT INSURANCE IF ANY IS TO BE TAKEN BY THE BUYER.</li>
+                    <li>ANY DISPUTES ARISING ARE SUBJECT TO COIMBATORE JURISDICTION.</li>
+                </ol>
+            </td>
+            <td style="width: 30%; text-align: center;  font-size: 10px !important;">
+                <p><strong>For SONALI WIRES LLP</strong></p><br><br><br><br><br><br><br><br><br>
+                <p><strong>Authorized Signatory</strong></p>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- PAGE BREAK -->
+<div class="page-break"></div>
+
+<!-- THIRD COPY - DUPLICATE FOR SUPPLIER -->
+<div class="invoice-copy">
+    
+    <table style="width: 100%; margin-bottom: 1px; border: hidden !important">
+        <tr>
+            <td style="text-align: left; border: hidden !important">
+                {% if doc.ewaybill %}
+                    <strong>E-Waybill:</strong> {{ doc.ewaybill }}
+                {% endif %}
+            </td>
+            <td style="text-align: right; border: hidden !important">
+                <strong>Triplicate for Supplier</strong>
+            </td>
+        </tr>
+    </table>
+    <div class="copy-header"></div>
+    <!-- Header Section -->
+    <table class="header-table">
+        <tr>
+            <td style="width: 35%; line-height: 1.2;">
+                <strong>Bill To:</strong><br>
+                <b>{{ doc.customer }}</b><br>
+                {% if doc.customer_address %}
+                    {% set billing_address = frappe.get_doc("Address", doc.customer_address) %}
+                    {{ billing_address.address_line1 }}<br>
+                    {% if billing_address.address_line2 %}{{ billing_address.address_line2 }}<br>{% endif %}
+                    {{ billing_address.city }}, {{ billing_address.state }} - {{ billing_address.pincode }}<br>
+                    GSTIN: {{ billing_address.gstin if billing_address.gstin else 'N/A' }}
+                {% endif %}
+            </td>
+
+            <td style="width: 35%; line-height: 1.2;">
+                {% set s_address = frappe.get_doc("Address", doc.shipping_address_name) %}
+                <strong>Ship To:</strong><br>
+                {{ s_address.address_title }}<br>
+                {{ doc.shipping_address }}<br>
+                GSTIN: 
+                {% set customer = frappe.get_doc("Customer", doc.customer) %}
+                {{ customer.gstin if customer.gstin else 'N/A' }}
+            </td>
+
+            <td class="text-left" style="width: 30%; line-height: 1.2;">
+                <div class="invoice-title">TAX INVOICE</div>
+                <strong>Invoice No:</strong> {{ doc.name }}<br>
+                <strong>Date:</strong> {{ frappe.utils.formatdate(doc.posting_date, "dd-mm-yyyy") }}<br>
+                <strong>Vehicle No:</strong> {{ doc.vehicle_no }}<br>
+                <strong>Carrier Name:</strong> {{ doc.custom_carrier_name }}<br>
+                <strong>Freight Term:</strong> {{ doc.custom_freight_term }}
+            </td>
+        </tr>
+    </table>
+
+    <!-- Item Table -->
+    {% set ns = namespace(total_weight=0, total_value=0) %}
+    <table class="items-table" style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <thead>
+            <tr>
+                <th style="text-align: center;">S/N</th>
+                <th style="text-align: center;">HSN</th>
+                <th style="text-align: center;">Description of Goods</th>
+                <th style="text-align: center;">Rate</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: center;">Unit</th>
+                <th style="text-align: center;">Disc(%)</th>
+                <th style="text-align: center;">Unit Price</th>
+                <th style="text-align: center">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in doc.items %}
+            <tr>
+                <td style="text-align: center;">{{ loop.index }}</td>
+                <td style="text-align: center;">{{ item.gst_hsn_code or " "}}</td>
+                <td style="text-align: center;">{{ item.description }}</td>
+                <td style="text-align: center;">{{ item.rate }}</td>
+
+                <td style="text-align: center;">
+                    {% set weight = item.custom_weight_in_kg|float %}
+                    {% set length = item.custom_length_in_meter|float %}
+                    
+                    {% set uom = (frappe.db.get_value("Item", item.item_code, "sales_uom") 
+                                  or frappe.db.get_value("Item", item.item_code, "stock_uom") 
+                                  or "N/A")|upper %}
+                
+                    {% if uom == "KG" %}
+                        {% set value = weight %}
+                    {% elif uom in ["METER", "MTR", "LENGTH"] %}
+                        {% set value = length %}
+                    {% elif uom in ["BOX", "BOXES", "COIL", "COILS"] %}
+                        {% set value = item.qty %}
+                    {% else %}
+                        {% set value = 0 %}
+                    {% endif %}
+                
+                    {{ "%.3f"|format(value) }}
+                </td>
+                
+                <td style="text-align: center;">
+                    {% set sales_uom = frappe.db.get_value("Item", item.item_code, "sales_uom") or item.uom %}
+                
+                    {% if sales_uom|lower == 'kg' %}
+                        Kg(s)
+                    {% elif sales_uom|lower == 'box' %}
+                        Box(s)
+                    {% elif sales_uom|lower == 'meter' %}
+                        Meter(s)
+                    {% else %}
+                        {{ sales_uom }}
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">0.00</td>
+                <td style="text-align: center;">{{ item.rate }}</td>
+                <td class="text-right" style='width:100px'>{{ "%.2f"|format(item.amount) }}</td>
+            </tr>
+            {% set ns.total_weight = ns.total_weight + (item.custom_weight_in_kg | float(0)) %}
+            {% set ns.total_value = ns.total_value + (item.amount | float(0)) %}
+            {% endfor %}
+    
+            <tr>
+                <td colspan="6">E&OE.</td>
+                <td colspan="2" class="text-right bold-text">Total Amount:</td>
+                <td class="text-right"><strong>₹{{ '%.2f'|format(ns.total_value) }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Summary -->
+    <table style="border-style: hidden !important; border-left: 1px solid black !important; border-right: 1px solid black !important; border-collapse: collapse;">
+        <tr>
+            <!-- Left Section (Invoice Details) -->
+            <td style="width: 50%; vertical-align: top; padding: 10px; border-right: 1px solid black;">
+                {% if doc.irn %}
+                    {% set e_invoice_log = frappe.db.get_value("e-Invoice Log", doc.irn, ("invoice_data", "signed_qr_code"), as_dict=True) %}
+                {% if e_invoice_log %}
+                    {% set invoice_data = json.loads(e_invoice_log.invoice_data) %}
+                    {% set date_format = frappe.db.get_single_value("System Settings", 'date_format').replace("mm", "MM") %}
+        
+                    <div style="padding-top: 5px; display: flex; align-items: center; justify-content: flex-start; margin-left: 8px;">
+                        <!-- QR Code -->
+                        <div style="width: 120px; height: 120px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                            {{ web_block('e-Invoice QR', values={'e_invoice_qr_text': e_invoice_log.signed_qr_code }) }}
+                        </div>
+                        <!-- IRN Details -->
+                        <div style="max-width: 150px; word-wrap: break-word; font-size: 12px; margin-left: 15px;">
+                            <p><b>IRN:</b> <span style="word-break: break-word;">{{ doc.irn }}</span></p>
+                            <p><b>Ack No.:</b> {{ invoice_data.get("AckNo") or '' }}</p>
+                            <p><b>Ack Date:</b> {{ frappe.utils.format_datetime(invoice_data.get("AckDt"), date_format) if invoice_data.get("AckDt") else '' }}</p>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </td>
+
+        <!-- Right Section (Tax & Totals) -->
+        <td style="width: 50%; vertical-align: top; padding: 0px !important;">
+            {# Tax Calculations #}
+            
+            <!-- Debugging Output -->
+            {# Uncomment this to check values while debugging #}
+            {# {% for item in doc.items %} 
+                {{ item.item_code }} - IGST Rate: {{ item.igst_rate }}, SGST Rate: {{ item.sgst_rate }}, CGST Rate: {{ item.cgst_rate }} <br> 
+            {% endfor %} #}
+            <table style="width: 100%; border-style: hidden !important;">
+                <tr>
+                    <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                        Amount Before Tax:
+                    </td>
+                    <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                        ₹{{ doc.total }}
+                    </td>
+                </tr>
+
+                {% for tax in doc.taxes %}
+                    {% if "IGST" in tax.account_head %}
+                        <tr>
+                            <td class="text-right bold-text" style="padding: 5px;">IGST @ {{ tax.rate }}%:</td>
+                            <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                        </tr>
+                    {% elif "CGST" in tax.account_head %}
+                        <tr>
+                            <td class="text-right bold-text" style="padding: 5px;">CGST @ {{ tax.rate }}%:</td>
+                            <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                        </tr>
+                    {% elif "SGST" in tax.account_head %}
+                        <tr>
+                            <td class="text-right bold-text" style="padding: 5px;">SGST @ {{ tax.rate }}%:</td>
+                            <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+
+                {% for tax in doc.taxes %}
+                    {% if "TCS" in tax.account_head %}
+                    <tr>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                            TCS @ {{ tax.rate }}%:
+                        </td>
+                        <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                            ₹{{ "%.2f"|format(tax.tax_amount) }}
+                        </td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+                
+                {# Loop for Rounded Off - S #}
+                {% for tax in doc.taxes %}
+                    {% if "Rounded Off - S" in tax.account_head %}
+                    <tr>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                            Round Off:
+                        </td>
+                        <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                            ₹{{ "%.2f"|format(tax.tax_amount) }}
+                        </td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+
+                <tr>
+                    <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                       Rounded Total:
+                    </td>
+                    <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                        ₹{{ "%.2f"|format(doc.outstanding_amount) }}
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- Amount in Words -->
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-top: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <tr>
+            <td><strong>IN WORDS: </strong> {{ doc.in_words.lower().replace("inr", "").replace(" and ", " ").replace(",", "").replace(" only", " rupees only").strip() }}</td>
+        </tr>
+    </table>
+
+    <!-- Bank Details -->
+    <table>
+        <tr>
+            <td>
+                <strong>Bank Details:</strong><br>
+                <b>Bank Name:</b> ICICI Bank, 
+                <b>Branch:</b> Trichy Road, Coimbatore,
+                <b>Account Number:</b> 001605021125, 
+                <b>IFSC Code:</b> ICIC0000016
+            </td>
+        </tr>
+    </table>
+
+    <!-- Terms and Conditions -->
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <tr>
+        <td style="width: 70%; vertical-align: top;">
+            <p style="font-size: 15px !important; font-weight: bold;">Terms & Conditions:</p>
+            <ol style=" font-size: 10px !important; margin-top: 5px; padding-left: 2px; list-style-position: inside;">
+                <li>NO CLAIMS ARE ENTERTAINED UNLESS BROUGHT TO OUR NOTICE WITHIN TWO DAYS ON RECEIPT OF GOODS.</li>
+                <li>GOODS ONCE SOLD WILL NOT BE TAKEN BACK.</li>
+                <li>INTEREST @ 24% WILL BE CHARGED ON OVERDUE PAYMENT.</li>
+                <li>WE ARE NOT RESPONSIBLE FOR BREAKAGE & DAMAGE IN TRANSIT.</li>
+                <li>TRANSIT INSURANCE IF ANY IS TO BE TAKEN BY THE BUYER.</li>
+                <li>ANY DISPUTES ARISING ARE SUBJECT TO COIMBATORE JURISDICTION.</li>
+            </ol>
+        </td>
+        <td style="width: 30%; text-align: center;  font-size: 10px !important;">
+            <p><strong>For SONALI WIRES LLP</strong></p><br><br><br><br><br><br><br><br><br>
+            <p><strong>Authorized Signatory</strong></p>
+        </td>
+        </tr>
+    </table>
+</div>
+
+<div class="page-break"></div>
+<!-- FOURTH COPY - ORIGINAL FOR RECIPIENT -->
+<div class="invoice-copy">
+    
+    <table style="width: 100%; margin-bottom: 1px; border: hidden !important">
+        <tr>
+            <td style="text-align: left; border: hidden !important">
+                {% if doc.ewaybill %}
+                    <strong>E-Waybill:</strong> {{ doc.ewaybill }}
+                {% endif %}
+            </td>
+            <td style="text-align: right; border: hidden !important">
+                <strong>Extra Copy</strong>
+            </td>
+        </tr>
+    </table>
+    <div class="copy-header"></div>
+    <!-- Header Section -->
+    <table class="header-table">
+        <tr>
+            <td style="width: 35%; line-height: 1.2;">
+                <strong>Bill To:</strong><br>
+                <b>{{ doc.customer }}</b><br>
+                {% if doc.customer_address %}
+                    {% set billing_address = frappe.get_doc("Address", doc.customer_address) %}
+                    {{ billing_address.address_line1 }}<br>
+                    {% if billing_address.address_line2 %}{{ billing_address.address_line2 }}<br>{% endif %}
+                    {{ billing_address.city }}, {{ billing_address.state }} - {{ billing_address.pincode }}<br>
+                    GSTIN: {{ billing_address.gstin if billing_address.gstin else 'N/A' }}
+                {% endif %}
+            </td>
+
+            <td style="width: 35%; line-height: 1.2;">
+                {% if doc.shipping_address_name %}
+                    {% set shipping_address = frappe.get_doc("Address", doc.shipping_address_name) %}
+                    <strong>Ship To:</strong><br>
+                    <b>{{ shipping_address.address_title }}</b><br>
+                    {{ shipping_address.address_line1 }}<br>
+                    {% if shipping_address.address_line2 %}{{ shipping_address.address_line2 }}<br>{% endif %}
+                    {{ shipping_address.city }}, {{ shipping_address.state }} - {{ shipping_address.pincode }}<br>
+                    GSTIN: {{ shipping_address.gstin if shipping_address.gstin else 'N/A' }}
+                {% else %}
+                    <strong>Ship To:</strong><br>
+                    N/A
+                {% endif %}
+            </td>
+
+            <td class="text-left" style="width: 30%; line-height: 1.2;">
+                <div class="invoice-title">TAX INVOICE</div>
+                <strong>Invoice No:</strong> {{ doc.name }}<br>
+                <strong>Date:</strong> {{ frappe.utils.formatdate(doc.posting_date, "dd-mm-yyyy") }}<br>
+                <strong>Vehicle No:</strong> {{ doc.vehicle_no }}<br>
+                <strong>Carrier Name:</strong> {{ doc.custom_carrier_name }}<br>
+                <strong>Freight Term:</strong> {{ doc.custom_freight_term }}
+            </td>
+        </tr>
+    </table>
+
+    <!-- Item Table -->
+    {% set ns = namespace(total_weight=0, total_value=0) %}
+    <table class="items-table" style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <thead>
+            <tr>
+                <th style="text-align: center;">S/N</th>
+                <th style="text-align: center;">HSN</th>
+                <th style="text-align: center;">Description of Goods</th>
+                <th style="text-align: center;">Rate</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: center;">Unit</th>
+                <th style="text-align: center;">Disc(%)</th>
+                <th style="text-align: center;">Unit Price</th>
+                <th style="text-align: center">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in doc.items %}
+            <tr>
+                <td style="text-align: center;">{{ loop.index }}</td>
+                <td style="text-align: center;">{{ item.gst_hsn_code or " "}}</td>
+                <td style="text-align: center;">{{ item.description }}</td>
+                <td style="text-align: center;">{{ item.rate }}</td>
+                <td style="text-align: center;">
+                    {% set weight = item.custom_weight_in_kg|float %}
+                    {% set length = item.custom_length_in_meter|float %}
+                    
+                    {% set uom = (frappe.db.get_value("Item", item.item_code, "sales_uom") 
+                                  or frappe.db.get_value("Item", item.item_code, "stock_uom") 
+                                  or "N/A")|upper %}
+                
+                    {% if uom == "KG" %}
+                        {% set value = weight %}
+                    {% elif uom in ["METER", "MTR", "LENGTH"] %}
+                        {% set value = length %}
+                    {% elif uom in ["BOX", "BOXES", "COIL", "COILS"] %}
+                        {% set value = item.qty %}
+                    {% else %}
+                        {% set value = 0 %}
+                    {% endif %}
+                
+                    {{ "%.3f"|format(value) }}
+                </td>
+                
+                <td style="text-align: center;">
+                    {% set sales_uom = frappe.db.get_value("Item", item.item_code, "sales_uom") or item.uom %}
+                
+                    {% if sales_uom|lower == 'kg' %}
+                        Kg(s)
+                    {% elif sales_uom|lower == 'box' %}
+                        Box(s)
+                    {% elif sales_uom|lower == 'meter' %}
+                        Meter(s)
+                    {% else %}
+                        {{ sales_uom }}
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">0.00</td>
+                <td style="text-align: center;">{{ item.rate }}</td>
+                <td class="text-right" style='width:100px'>{{ "%.2f"|format(item.amount) }}</td>
+            </tr>
+            {% set ns.total_weight = ns.total_weight + (item.custom_weight_in_kg | float(0)) %}
+            {% set ns.total_value = ns.total_value + (item.amount | float(0)) %}
+            {% endfor %}
+    
+            <tr>
+                <td colspan="6">E&OE.</td>
+                <td colspan="2" class="text-right bold-text">Total Amount:</td>
+                <td class="text-right"><strong>₹{{ '%.2f'|format(ns.total_value) }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Summary -->
+    <table style="border-style: hidden !important; border-left: 1px solid black !important; border-right: 1px solid black !important; border-collapse: collapse;">
+        <tr>
+            <!-- Left Section (Invoice Details) -->
+            <td style="width: 50%; vertical-align: top; padding: 10px; border-right: 1px solid black;">
+                {% if doc.irn %}
+                    {% set e_invoice_log = frappe.db.get_value("e-Invoice Log", doc.irn, ("invoice_data", "signed_qr_code"), as_dict=True) %}
+                    {% if e_invoice_log %}
+                        {% set invoice_data = json.loads(e_invoice_log.invoice_data) %}
+                        {% set date_format = frappe.db.get_single_value("System Settings", 'date_format').replace("mm", "MM") %}
+            
+                        <div style="padding-top: 5px; display: flex; align-items: center; justify-content: flex-start; margin-left: 8px;">
+                            <!-- QR Code -->
+                            <div style="width: 120px; height: 120px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                                {{ web_block('e-Invoice QR', values={'e_invoice_qr_text': e_invoice_log.signed_qr_code }) }}
+                            </div>
+                            <!-- IRN Details -->
+                            <div style="max-width: 150px; word-wrap: break-word; font-size: 12px; margin-left: 15px;">
+                                <p><b>IRN:</b> <span style="word-break: break-word;">{{ doc.irn }}</span></p>
+                                <p><b>Ack No.:</b> {{ invoice_data.get("AckNo") or '' }}</p>
+                                <p><b>Ack Date:</b> {{ frappe.utils.format_datetime(invoice_data.get("AckDt"), date_format) if invoice_data.get("AckDt") else '' }}</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </td>
+
+            <!-- Right Section (Tax & Totals) -->
+            <td style="width: 50%; vertical-align: top; padding: 0px !important;">
+                <table style="width: 100%; border-style: hidden !important;">
+                    <tr>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                            Amount Before Tax:
+                        </td>
+                        <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                            ₹{{ doc.total }}
+                        </td>
+                    </tr>
+
+                    {% for tax in doc.taxes %}
+                        {% if "IGST" in tax.account_head %}
+                            <tr>
+                                <td class="text-right bold-text" style="padding: 5px;">IGST @ {{ tax.rate }}%:</td>
+                                <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                            </tr>
+                        {% elif "CGST" in tax.account_head %}
+                            <tr>
+                                <td class="text-right bold-text" style="padding: 5px;">CGST @ {{ tax.rate }}%:</td>
+                                <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                            </tr>
+                        {% elif "SGST" in tax.account_head %}
+                            <tr>
+                                <td class="text-right bold-text" style="padding: 5px;">SGST @ {{ tax.rate }}%:</td>
+                                <td class="text-right" style="padding: 5px;">₹{{ "%.2f"|format(tax.tax_amount) }}</td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% for tax in doc.taxes %}
+                        {% if "TCS" in tax.account_head %}
+                        <tr>
+                            <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                                TCS @ {{ tax.rate }}%:
+                            </td>
+                            <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                                ₹{{ "%.2f"|format(tax.tax_amount) }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% for tax in doc.taxes %}
+                        {% if "Rounded Off - S" in tax.account_head %}
+                        <tr>
+                            <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                                Round Off:
+                            </td>
+                            <td class="text-right" style="border-bottom: 1px solid black; padding: 5px;">
+                                ₹{{ "%.2f"|format(tax.tax_amount) }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+
+                    <tr>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                           Rounded Total:
+                        </td>
+                        <td class="text-right bold-text" style="border-bottom: 1px solid black; padding: 5px;">
+                            ₹{{ "%.2f"|format(doc.outstanding_amount) }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+    
+    <!-- Amount in Words -->
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-top: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <tr>
+            <td><strong>IN WORDS: </strong> {{ doc.in_words.lower().replace("inr", "").replace(" and ", " ").replace(",", "").replace(" only", " rupees only").strip() }}</td>
+        </tr>
+    </table>
+
+    <!-- Bank Details -->
+    <table>
+        <tr>
+            <td>
+                <strong>Bank Details:</strong><br>
+                <b>Bank Name:</b> ICICI Bank, 
+                <b>Branch:</b> Trichy Road, Coimbatore,
+                <b>Account Number:</b> 001605021125, 
+                <b>IFSC Code:</b> ICIC0000016
+            </td>
+        </tr>
+    </table>
+
+    <!-- Terms and Conditions -->
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+        <tr>
+            <td style="width: 70%; vertical-align: top;">
+                <p style="font-size: 15px !important; font-weight: bold; margin-top: 5px; padding-left: 2px; list-style-position: inside;">Terms & Conditions:</p>
+                <ol style=" font-size: 10px !important;">
+                    <li>NO CLAIMS ARE ENTERTAINED UNLESS BROUGHT TO OUR NOTICE WITHIN TWO DAYS ON RECEIPT OF GOODS.</li>
+                    <li>GOODS ONCE SOLD WILL NOT BE TAKEN BACK.</li>
+                    <li>INTEREST @ 24% WILL BE CHARGED ON OVERDUE PAYMENT.</li>
+                    <li>WE ARE NOT RESPONSIBLE FOR BREAKAGE & DAMAGE IN TRANSIT.</li>
+                    <li>TRANSIT INSURANCE IF ANY IS TO BE TAKEN BY THE BUYER.</li>
+                    <li>ANY DISPUTES ARISING ARE SUBJECT TO COIMBATORE JURISDICTION.</li>
+                </ol>
+            </td>
+            <td style="width: 30%; text-align: center;  font-size: 10px !important;">
+                <p><strong>For SONALI WIRES LLP</strong></p><br><br><br><br><br><br><br><br><br>
+                <p><strong>Authorized Signatory</strong></p>
+            </td>
+        </tr>
+    </table>
+</div>
+
+</body>
+</html>
