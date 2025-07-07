@@ -1,0 +1,39 @@
+SELECT
+    b.item_code AS "Item:Link/Item:150",
+    b.warehouse AS "Warehouse:Link/Warehouse:180",
+
+    -- Box Qty
+    CASE 
+        WHEN LOWER(i.sales_uom) = 'box' THEN b.actual_qty 
+        ELSE 0 
+    END AS "Box Qty:Float:100",
+
+    -- Weight Qty
+    CASE 
+        WHEN LOWER(i.sales_uom) IN ('kg', 'g', 'gram', 'ton') THEN b.actual_qty 
+        ELSE 0 
+    END AS "Weight Qty:Float:100",
+
+    -- Length Qty
+    CASE 
+        WHEN LOWER(i.sales_uom) IN ('m', 'meter', 'cm', 'mm') THEN b.actual_qty 
+        ELSE 0 
+    END AS "Length Qty:Float:100",
+
+    b.stock_value AS "Stock Value:Currency:120"
+
+FROM 
+    `tabBin` b
+JOIN 
+    `tabItem` i ON b.item_code = i.name
+
+WHERE 
+    b.actual_qty != 0
+    AND (
+        (LOWER(i.sales_uom) = 'box')
+        OR (LOWER(i.sales_uom) IN ('kg', 'g', 'gram', 'ton'))
+        OR (LOWER(i.sales_uom) IN ('m', 'meter', 'cm', 'mm'))
+    )
+
+ORDER BY 
+    b.item_code, b.warehouse

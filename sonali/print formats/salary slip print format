@@ -1,0 +1,136 @@
+<style>
+.salary-slip {
+    width: 100%;
+    max-width: 800px;
+    margin: auto;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    padding: 20px;
+    border: 1px solid #000;
+    box-sizing: border-box;
+}
+
+.salary-slip table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.salary-slip th, .salary-slip td {
+    border: 1px solid black;
+    padding: 6px;
+    vertical-align: top;
+}
+
+.salary-slip .no-border td {
+    border: none;
+    padding: 4px 6px;
+}
+
+.bold {
+    font-weight: bold;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.header-logo {
+    text-align: center;
+    margin-bottom: 10px;
+}
+</style>
+
+<div class="salary-slip">
+    <!-- Logo with horizontal line below -->
+    <div class="header-logo">
+        <img src="/private/files/sonali logo.jpeg" alt="Sonali Wires LLP">
+        <hr style="border: 1px solid black; margin-top: 8px; margin-bottom: 12px;">
+    </div>
+
+    <!-- Month Heading -->
+    <h4 style="text-align:center; margin-bottom: 10px;">
+        Salary Slip for the Month of {{ frappe.utils.formatdate(doc.start_date, "MMMM yyyy") }}
+    </h4>
+
+
+    <!-- Employee Details -->
+    <table class="no-border">
+        <tr>
+            <td><b>EMP CODE</b>: {{ doc.employee }}</td>
+            <td><b>UAN</b>: {{ doc.get("uan", "None") }}</td>
+        </tr>
+        <tr>
+            <td><b>EMPNAME</b>: {{ doc.employee_name }}</td>
+            <td><b>ESI NO</b>: {{ doc.get("esi_number", "None") }}</td>
+        </tr>
+        <tr>
+            <td><b>DESIGNATION</b>: {{ doc.designation }}</td>
+            <td><b>BANK NAME</b>: {{ doc.get("bank_name", "") }}</td>
+        </tr>
+        <tr>
+            <td><b>DOJ</b>: {{ frappe.utils.formatdate(frappe.db.get_value("Employee", doc.employee, "date_of_joining"), "dd-MM-yyyy") }}</td>
+            <td><b>ACCOUNT NUMBER</b>: {{ "{:.0f}".format(doc.get("bank_account_no")|float) if doc.get("bank_account_no") else "" }}</td>
+        </tr>
+        <tr>
+            <td><b>DEPARTMENT</b>: {{ doc.department }}</td>
+            <td><b>NO OF DAYS WORKED</b>: {{ doc.total_working_days }}</td>
+        </tr>
+        <tr>
+            <td><b>PAN NUMBER</b>: {{ frappe.db.get_value("Employee", doc.employee, "pan_number") or "" }}</td>
+            <td><b>LOP DAYS</b>: {{ doc.leave_without_pay or 0 }}</td>
+        </tr>
+        <tr>
+            <td><b>LOCATION</b>: {{ doc.branch or doc.company }}</td>
+            <td></td>
+        </tr>
+    </table>
+
+    <!-- Earnings & Deductions -->
+    <br>
+    <table>
+        <tr class="bold">
+            <th>EARNINGS</th>
+            <th>ACTUAL</th>
+            <th>EARNED</th>
+        </tr>
+        {% for e in doc.earnings %}
+        <tr>
+            <td>{{ e.salary_component }}</td>
+            <td class="text-right">{{ "%.2f"|format(e.amount or 0) }}</td>
+            <td class="text-right">{{ "%.2f"|format(e.amount or 0) }}</td>
+        </tr>
+        {% endfor %}
+
+        <tr class="bold">
+            <th>DEDUCTIONS</th>
+            <th>AMOUNT</th>
+            <th></th>
+        </tr>
+        {% for d in doc.deductions %}
+        <tr>
+            <td>{{ d.salary_component }}</td>
+            <td class="text-right">{{ "%.2f"|format(d.amount or 0) }}</td>
+            <td></td>
+        </tr>
+        {% endfor %}
+
+        <!-- Totals -->
+        <tr class="bold">
+            <td colspan="2">GROSS EARNINGS</td>
+            <td class="text-right">{{ "%.2f"|format(doc.gross_pay or 0) }}</td>
+        </tr>
+        <tr class="bold">
+            <td colspan="2">GROSS DEDUCTIONS</td>
+            <td class="text-right">{{ "%.2f"|format(doc.total_deduction or 0) }}</td>
+        </tr>
+        <tr class="bold">
+            <td colspan="2">NET PAY</td>
+            <td class="text-right">{{ "%.2f"|format(doc.net_pay or 0) }}</td>
+        </tr>
+    </table>
+
+    <!-- In Words -->
+    <br>
+    <p class="bold">IN WORDS: {{ frappe.utils.money_in_words(doc.net_pay or 0).replace("INR", "Rupees").replace(",", "") }}</p>
+</div>
