@@ -1,0 +1,211 @@
+<!-- Company Header -->
+<table style="width: 99.5%; border-collapse: collapse; line-height: 1.2; border: none;">
+    <tr>
+        <!-- Left: Logo -->
+        <td style="width: 150px; text-align: left; vertical-align: middle; border: none;">
+            {% set company_name = frappe.db.get_single_value("Global Defaults", "default_company") %}
+            {% if company_name %}
+                {% set company = frappe.get_doc("Company", company_name) %}
+                {% if company.logo_for_printing %}
+                    <img src="{{ frappe.utils.get_url(company.logo_for_printing) }}" alt="Company Logo"
+                         style="width: 100px; height: auto; display: block;">
+                {% endif %}
+            {% endif %}
+        </td>
+
+        <!-- Center: Company Name and Address -->
+        <td style="text-align: center; border: none;">
+            <h2>Srinath Collective</h2>
+            {% set address_doc = frappe.get_doc("Address", "Srinath-Billing") %}
+            <p>
+                {{ address_doc.address_line1 or '' }}<br>
+                {% if address_doc.address_line2 %}{{ address_doc.address_line2 }}<br>{% endif %}
+                {{ address_doc.city or '' }}, {{ address_doc.state or '' }} - {{ address_doc.pincode or '' }}<br>
+                {{ address_doc.phone }}<br>
+                <strong>GSTIN: {{ address_doc.gstin }}</strong>
+            </p>
+        </td>
+
+        <td style="width: 120px; border: none;"></td>
+    </tr>
+</table>
+
+<!-- Title -->
+<p style="text-align: center; font-size: 20px;"><strong>Credit Note</strong></p>
+
+<!-- Credit Note Info -->
+<table width="99.5%" border="1" cellspacing="0" cellpadding="5" style="line-height: 1;">
+    <tr>
+        <td><strong>CN No. :</strong> {{ doc.name }}</td>
+        <td><strong>Invoice No. :</strong> {{ doc.return_against or " " }}</td>
+    </tr>
+    <tr>
+        <td><strong>State :</strong> {{ doc.place_of_supply }}</td>
+        <td><strong>Date :</strong> {{ frappe.utils.formatdate(doc.posting_date, "dd-MM-yyyy") }}</td>
+    </tr>
+    <tr>
+        <td><strong>Reason :</strong> Sales Return</td>
+        <td><strong>Ack No. :</strong> IRN Pending</td>
+    </tr>
+    <tr>
+        <td><strong>Sales Consultant :</strong>
+            {% for member in doc.sales_team %}
+                {{ member.sales_person }}{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        </td>
+        <td></td>
+    </tr>
+</table>
+
+<!-- Billing and Shipping Info -->
+<table width="99.5%" border="1" cellspacing="0" cellpadding="5" style="line-height: 1.2;">
+    <tr>
+        <!-- Receiver / Billing Address -->
+        <td width="50%">
+            <strong>Details of Receiver / Billed to:</strong><br>
+            {{ doc.customer_name }}<br>
+            {% if doc.customer_address %}
+                {% set billing_address = frappe.get_doc("Address", doc.customer_address) %}
+                {{ billing_address.address_line1 or '' }}<br>
+                {% if billing_address.address_line2 %}{{ billing_address.address_line2 }}<br>{% endif %}
+                {{ billing_address.city or '' }}, {{ billing_address.state or '' }} - {{ billing_address.pincode or '' }}<br>
+                <strong>GSTIN:</strong> {{ billing_address.gstin or '' }}
+            {% else %}
+                <span style="color:red;"></span>
+            {% endif %}
+        </td>
+
+        <!-- Consignee / Shipping Address -->
+        <td width="50%">
+            <strong>Details of Consignee / Shipped to:</strong><br>
+            {{ doc.customer_name }}<br>
+            {% if doc.shipping_address_name %}
+                {% set shipping_address = frappe.get_doc("Address", doc.shipping_address_name) %}
+                {{ shipping_address.address_line1 or '' }}<br>
+                {% if shipping_address.address_line2 %}{{ shipping_address.address_line2 }}<br>{% endif %}
+                {{ shipping_address.city or '' }}, {{ shipping_address.state or '' }} - {{ shipping_address.pincode or '' }}<br>
+                <strong>GSTIN:</strong> {{ shipping_address.gstin or '' }}
+            {% else %}
+                <span style="color:red;"></span>
+            {% endif %}
+        </td>
+    </tr>
+
+    <!-- GST State Number and State Row -->
+    <tr>
+        <td>
+            {% if billing_address %}
+                <strong>GST State:</strong> {{ billing_address.gst_state or 'N/A' }} ({{ billing_address.gst_state_number or 'N/A' }})
+            {% endif %}
+        </td>
+        <td>
+            {% if shipping_address %}
+                <strong>GST State:</strong> {{ shipping_address.gst_state or 'N/A' }} ({{ shipping_address.gst_state_number or 'N/A' }})
+            {% endif %}
+        </td>
+    </tr>
+</table>
+
+
+<!-- Items Table -->
+<table width="99.5%" border="1" cellspacing="0" cellpadding="5" style="line-height: 1;">
+    <tr>
+        <th>SR NO.</th>
+        <th>NAME OF PRODUCT / SERVICE</th>
+        <th>QTY</th>
+        <th>UOM</th>
+        <th>RATE</th>
+        <th>AMOUNT</th>
+        <th>DISC.</th>
+        <th>TOTAL</th>
+    </tr>
+    {% for item in doc.items %}
+    <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ item.item_name }}</td>
+        <td>{{ item.qty }}</td>
+        <td>{{ item.uom }}</td>
+        <td>{{ "%.2f"|format(item.price_list_rate) }}</td>
+        <td>{{ "%.2f"|format(item.price_list_rate * item.qty) }}</td>
+        <td>{{ item.discount_percentage or 0 }}%</td>
+        <td>{{ item.amount }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<!-- Totals Table -->
+{% set ns = doc %}
+{% set gst = namespace(total=0) %}
+<table width="99.5%" border="1" cellspacing="0" cellpadding="5" style="line-height: 1;">
+    <tr>
+        <td class="text-right bold" colspan="6">Total Amount Before Tax</td>
+        <td class="text-right">{{ "%.2f"|format(doc.total) }}</td>
+    </tr>
+    {% for tax in ns.taxes %}
+        {% set gst.total = gst.total + tax.tax_amount %}
+        {% if "IGST" in tax.account_head %}
+        <tr>
+            <td class="text-right bold" colspan="5">IGST</td>
+            <td class="text-right">{{ tax.rate }}%</td>
+            <td class="text-right">{{ tax.tax_amount }}</td>
+        </tr>
+        {% elif "CGST" in tax.account_head %}
+        <tr>
+            <td class="text-right bold" colspan="5">CGST</td>
+            <td class="text-right">{{ tax.rate }}%</td>
+            <td class="text-right">{{ tax.tax_amount }}</td>
+        </tr>
+        {% elif "SGST" in tax.account_head %}
+        <tr>
+            <td class="text-right bold" colspan="5">SGST</td>
+            <td class="text-right">{{ tax.rate }}%</td>
+            <td class="text-right">{{ tax.tax_amount }}</td>
+        </tr>
+        {% endif %}
+    {% endfor %}
+    <tr>
+        <td class="text-right bold" colspan="6">Tax Amount (GST)</td>
+        <td class="text-right">{{ gst.total }}</td>
+    </tr>
+    <tr>
+        <td class="text-right bold" colspan="6">Total Amount After Tax</td>
+        <td class="text-right">{{ doc.grand_total }}</td>
+    </tr>
+    <tr>
+        <td class="text-right bold" colspan="6">Round Off</td>
+        <td class="text-right">{{ doc.rounding_adjustment }}</td>
+    </tr>
+    <tr>
+        <td class="text-right bold" colspan="6">Net Payable</td>
+        <td class="text-right">{{ doc.rounded_total }}</td>
+    </tr>
+    <tr>
+        <td class="bold" colspan="7">Amount Chargeable (in words): {{ doc.in_words }}</td>
+    </tr>
+</table>
+
+<!-- Terms and Signatory Section -->
+<table style="width: 99.5%; line-height: 1.2;" border="1" cellspacing="0" cellpadding="5">
+    <!-- Terms & Conditions -->
+    <tr>
+        <td colspan="3">
+            <p><strong>Terms & Conditions:</strong></p>
+            <ol style="margin-top: 4px; padding-left: 18px; font-size: 12px;">
+                <li>Goods once sold cannot be taken back.</li>
+                <li>Our risk & responsibility ceases once the goods leave our premises.</li>
+                <li>Interest @ 24% p.a. will be charged for the payment beyond 30 days.</li>
+            </ol>
+        </td>
+        <td colspan="3" style="text-align: center;">
+            <p style="font-size: 10px; margin: 0;">Certified that the particulars given above are true and correct.</p>
+            <strong>For {{ doc.company }}</strong><br><br><br>
+            <span class="signatory">Authorised Signatory</span>
+        </td>
+    </tr>
+
+    <!-- Prepared By (in its own row) -->
+    <tr>
+        <td colspan="1" style="border-right: hidden;"><strong>Prepared By:</strong> {{ doc.owner.split('@')[0] }}</td>
+    </tr>
+</table>
+

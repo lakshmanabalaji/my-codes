@@ -1,0 +1,169 @@
+<style>
+    .voucher-container {
+        font-family: Arial, sans-serif;
+        width: 99.80%;
+        padding: 5px;
+        border: 1px solid #000;
+    }
+
+    .logo-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 5px;
+    }
+
+    .logo-image {
+        width: 120px;
+        height: 120px;
+        object-fit: contain;
+    }
+
+    .company-info {
+        text-align: center;
+        flex: 1;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    .company-info .title {
+        font-size: 18px;
+        font-weight: bold;
+    }
+
+    .section-header {
+        text-align: center;
+        font-size: 16px;
+        font-weight: bold;
+        margin: 5px 0;
+    }
+
+    .meta {
+        margin: 5px 0;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 5px;
+        font-size: 13px;
+    }
+
+    .table th {
+        /*border: 1px solid #000;*/
+        padding: 6px;
+        text-align: left;
+        vertical-align: top;
+        background-color: #fff;
+        color: #000;
+    }
+    , .table td {
+        /*border: 1px solid #000;*/
+        padding: 6px;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .bold {
+        font-weight: bold;
+    }
+
+    .footer {
+        margin-top: 40px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+    }
+
+    .signature-box {
+        width: 30%;
+        text-align: center;
+    }
+    .table tr {border-collapse: collapse;}
+</style>
+
+
+
+    <!-- Header Section with new styling -->
+    <div class="logo-header">
+        <div>
+            {% set company_name = frappe.db.get_single_value("Global Defaults", "default_company") %}
+            {% if company_name %}
+                {% set company = frappe.get_doc("Company", company_name) %}
+                {% if company.logo_for_printing %}
+                    <img src="{{ frappe.utils.get_url(company.logo_for_printing) }}" alt="Company Logo" class="logo-image">
+                {% endif %}
+            {% endif %}
+        </div>
+        <div class="company-info">
+            <div class="title">Srinath Sanitarywares</div>
+            #1010, Srinath Mansion, Dr. Rajkumar Road,<br>
+            Rajajinagar, Bangalore - 560010<br>
+            8023303393, 8023303394
+            <div class="section-header">Journal Voucher</div>
+        </div>
+        <div style="width:80px;"></div> <!-- For spacing alignment -->
+    </div>
+<div class="voucher-container">
+    <!-- Meta -->
+    <div class="meta">
+        <div>No.: <strong>{{ doc.name }}</strong></div>
+        <div>Dated: <strong>{{ frappe.utils.formatdate(doc.posting_date) }}</strong></div>
+    </div>
+
+    <!-- Table -->
+    <!-- Table -->
+<table class="table" style="border: 1px solid #000;">
+    <thead>
+        <tr>
+            <th style="border: 1px solid #000;">ACCOUNT</th>
+            <th style="border: 1px solid #000;">DEBIT</th>
+            <th style="border: 1px solid #000;">CREDIT</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for row in doc.accounts %}
+        <tr style="border-top:  1px solid #000; border-left: 1px solid #000; border-right: 1px solid #000; border-bottom: 1px solid #000;">
+            <td style="border: 1px solid #000;">
+                {{ row.account }}
+                {% if row.party and row.party_type == "Customer" %}
+                    {% set customer = frappe.get_doc("Customer", row.party) %}
+                    <br>{{ customer.customer_name }}
+                {% endif %}
+            </td>
+            <td style="text-align:right; border-top: 1px solid #000 !important; border-left: 1px solid #000; border-right: 1px solid #000; border-bottom: 1px solid #000;">{{ row.debit | round(2) if row.debit else '' }}</td>
+            <td style="text-align:right; border-top: 1px solid #000 !important; border-left: 1px solid #000; border-right: 1px solid #000; border-bottom: 1px solid #000;">{{ row.credit | round(2) if row.credit else '' }}</td>
+        </tr>
+    {% endfor %}
+
+    {% if doc.user_remark %}
+    <tr>
+    <td colspan="1" style="border-left: 1px solid #000; border-right: 1px solid #000; border-bottom: 1px solid #000; border-top: none;">
+        <strong>Narration:</strong><br>{{ doc.user_remark }}
+    </td>
+    <td style="border-left: 1px solid #000; border-right: 1px solid #000; border-bottom: 1px solid #000; border-top: none;"></td>
+    <td style="border-left: 1px solid #000; border-right: 1px solid #000; border-bottom: 1px solid #000; border-top: none;"></td>
+</tr>
+
+    {% endif %}
+
+    <tr class="bold">
+        <td style="border: 1px solid #000;">Amount (in words):<br>{{ frappe.utils.money_in_words(doc.total_debit or doc.total_credit) }}</td>
+        <td style="text-align:right; border: 1px solid #000;">{{ doc.total_debit | round(2) }}</td>
+        <td style="text-align:right; border: 1px solid #000;">{{ doc.total_credit | round(2) }}</td>
+    </tr>
+    </tbody>
+</table>
+
+
+    <!-- Footer -->
+    <div class="footer">
+        <div class="signature-box">Prepared By: {{ doc.owner.split("@")[0].title() }}</div>
+        <div class="signature-box">Approved By: {{ doc.owner.split("@")[0].title() }}</div>
+        <div class="signature-box">Authorised Signatory</div>
+    </div>
+
+</div>
