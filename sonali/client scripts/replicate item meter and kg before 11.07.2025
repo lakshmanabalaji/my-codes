@@ -1,0 +1,50 @@
+frappe.ui.form.on('Item', {
+    refresh: function(frm) {
+        // Add custom "METER" and "KG" buttons to the Item form
+        frm.add_custom_button(__('METER'), function() {
+            create_item_with_suffix(frm, 'METER');
+        });
+
+        frm.add_custom_button(__('KG'), function() {
+            create_item_with_suffix(frm, 'KG');
+        });
+    }
+});
+
+// Function to create a new item with the suffix, item group change, and UOM update
+function create_item_with_suffix(frm, suffix) {
+    // Replicate the current item and modify the necessary fields
+    let new_item = frappe.model.copy_doc(frm.doc);
+    new_item.item_code = frm.doc.item_code + ' - ' + suffix;
+    new_item.item_name = frm.doc.item_name + ' - ' + suffix; // Update item_name
+    new_item.item_group = 'Sub Assemblies'; // Set the Item Group to Sub Assemblies
+
+    // Update stock_uom and UOMs table based on the suffix
+    new_item.stock_uom = suffix; // Set stock_uom to METER or KG
+    new_item.uoms = []; // Clear the current UOMs table completely
+
+    // Create new UOM for the new item
+    new_item.uoms.push({
+        uom: suffix, // Set UOM to METER or KG
+        conversion_factor: 1 // Set conversion factor to 1 (assuming no conversion)
+    });
+
+    // Create a new document and insert it manually
+    frappe.call({
+        method: "frappe.client.insert",
+        args: {
+            doc: new_item
+        },
+        callback: function(response) {
+            if (response.message) {
+                const new_doc = response.message;
+                frappe.msgprint(__('Item {0} created successfully!', [new_doc.item_code]));
+                // Optionally, you can open the new item form after creation
+                frappe.set_route('Form', 'Item', new_doc.name);
+            }
+        },
+        error: function(error) {
+            frappe.msgprint(__('Error creating item: {0}', [error.message]));
+        }
+    });
+}

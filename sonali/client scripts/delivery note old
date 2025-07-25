@@ -1,0 +1,62 @@
+frappe.ui.form.on("Delivery Note", {
+    scan_barcode: function (frm) {
+        let barcode = frm.doc.scan_barcode;
+        if (!barcode) return;
+
+        frappe.call({
+            method: "frappe.client.get_list",
+            args: {
+                doctype: "Serial No",
+                filters: { name: barcode },
+                fields: ["item_code", "batch_no", "custom_weight", "warehouse", "item_name","custom_length"]
+            },
+            callback: function (r) {
+                if (r.message && r.message.length > 0) {
+                    let serial_data = r.message[0];
+
+                    // Fetch additional details like UOM from Item Doctype
+                    frappe.call({
+                        method: "frappe.client.get",
+                        args: {
+                            doctype: "Item",
+                            name: serial_data.item_code
+                        },
+                        callback: function (item_response) {
+                            if (item_response.message) {
+                                frappe.show_alert({
+                                    message: __('Barcode Scanned: ') + barcode,
+                                    indicator: 'green'
+                                });
+                                let item = item_response.message;
+
+                                // Add a new row manually instead of grouping
+                                let new_row = frm.add_child("items");
+                                new_row.item_code = serial_data.item_code;
+                                new_row.serial_no = barcode;
+                                new_row.batch_no = serial_data.batch_no || "";
+                                new_row.custom_weight = serial_data.custom_weight;
+                                new_row.custom_length = serial_data.custom_length;
+                                new_row.warehouse = serial_data.warehouse;
+                                new_row.qty = 1;  // Always add a new row with qty 1
+                                new_row.item_name = serial_data.item_name;
+                                new_row.uom = item.stock_uom || "Nos";  // Fetch UOM from Item doctype
+                                new_row.stock_uom = item.stock_uom || "Nos";  
+                                new_row.conversion_factor = 1;  // Default conversion factor
+
+                                frm.refresh_field("items");
+                            }
+                        }
+                    });
+
+                } else {
+                    frappe.show_alert({
+                                    message: __('Serial Number not found'),
+                                    indicator: 'red'
+                                });
+                }
+            }
+        });
+
+        frm.set_value("scan_barcode", ""); // Clear barcode field after scanning
+    }
+});

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page:first {
+            margin-top: 65mm; /* Large margin for the first page */
+            margin-bottom: 20mm;
+        }
+
+        @page {
+            margin: 20mm 12mm 20mm 12mm; /* top, right, bottom, left */
+        }
+
+        body {
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            table-layout: fixed;
+            overflow: hidden;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        .header-table {
+            width: 100%;
+            border: none;
+        }
+        .header-table td {
+            border: 1px solid #000;
+            padding: 5px;
+        }
+        /*.invoice-title {*/
+        /*    font-size: 18px;*/
+        /*    font-weight: bold;*/
+        /*    text-align: center;*/
+        /*    border-bottom: 2px solid black;*/
+        /*    padding-bottom: 2px;*/
+        /*}*/
+        .bold-text {
+            font-weight: bold;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .text-left {
+            text-align: left;
+        }
+        .terms {
+            font-size: 10px;
+        }
+
+        /* Ensures table headers repeat on new pages */
+        thead { display: table-header-group; }
+        tfoot { display: table-row-group; }
+        tr { page-break-inside: avoid; }
+    </style>
+</head>
+<body>
+    <table>
+        <tr>
+            <td  class="text-center">
+                <strong>Purchase Order</strong>
+            </td>
+        </tr>
+    </table>
+    <!-- Header Section -->
+    <table class="header-table">
+        <tr>
+            <td class="text-left" style="width: 50%;">
+                <strong>Supplier :-  {{ doc.supplier }}</strong><br><br>
+                <strong>Address :- </strong> {{ doc.address_display }}
+                <strong>Email Address :- </strong> {{ doc.contact_email }}<br>
+                <strong>Mobile No :- </strong> {{ doc.contact_mobile }}
+            </td>
+            <td class="text-left" style="width: 50%; line-height: 1.5;">
+                <strong>Order No :- </strong> {{ doc.name }}<br>
+                <strong>Order Date :- </strong> {{ doc.transaction_date }}<br>
+                <strong>Freight :- </strong> {{ doc.shipping_rule }}<br>
+                <strong>Delivery Date :- </strong> {{ doc.schedule_date }}<br>
+                <strong>Payment Terms :- </strong> 
+                    {% for term in doc.payment_schedule %}
+                        {{ term.payment_term }}
+                    {% endfor %}
+                    <br>
+                <strong>GSTIN :- {{ doc.supplier_gstin }} </strong><br>
+                <strong>PAN :- {{ frappe.db.get_value("Supplier", doc.supplier, "pan") }} </strong>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Item Table -->
+    {% set ns = namespace(total_qty=0, total_value=0) %}
+    <table>
+    <colgroup>
+        <col style="width: 7%;"> 
+        <col style="width: 50%;"> 
+        <col style="width: 10%;">
+        <col style="width: 8%;">
+        <col style="width: 12%;"> 
+        <col style="width: 13%;"> 
+    </colgroup>
+    <thead>
+        <tr>
+            <th>Sr No</th>
+            <th>Product Name</th>
+            <th>Qty</th>
+            <th>Unit</th>
+            <th>Unit Price</th>
+            <th>Amount</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in doc.items %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ item.description }}</td>
+            <td class="text-right">{{ item.qty }}</td>
+            <td>KGS</td>
+            <td class="text-right">{{ item.rate }}</td>
+            <td class="text-right">{{ item.amount }}</td>
+        </tr>
+        {% set ns.total_qty = ns.total_qty + (item.qty | float(0)) %}
+        {% set ns.total_value = ns.total_value + (item.amount | float(0)) %}
+        {% endfor %}
+        
+        <tr>
+            <td colspan="2">Remarks :- {{ doc.custom_remarks }}</td>
+            <td class="text-right">
+               <strong>{{ ns.total_qty }}</strong>
+            </td>
+            <td>###</td>
+            <td colspan="1" class="text-right bold-text">Total Value:</td>
+            <td class="text-right"><strong>{{ '%.2f'|format(ns.total_value) }}</strong></td>
+        </tr>
+    </tbody>
+</table>
+
+    <!-- Summary -->
+    <table style="width: 100%; border-collapse: collapse; border: none;">
+    <tr>
+        <!-- Left Section (Invoice Details) -->
+        <td style="width: 60%; vertical-align: top; padding: 10px; border-right: none;">
+        </td>
+        
+<!-- Right Section (Tax Details) -->
+<td style="width: 40%; vertical-align: top; text-align: right; padding: 10px;">
+    {% set total_igst = doc.items | sum(attribute='igst_amount') %}
+    {% set total_sgst = doc.items | sum(attribute='sgst_amount') %}
+    {% set total_cgst = doc.items | sum(attribute='cgst_amount') %}
+    
+    <!-- Debugging: Print Tax Details -->
+     {# {% for tax in doc.taxes %}
+    <p>{{ tax.account_head }} - {{ tax.charge_type }} - {{ tax.tax_amount }}</p>
+{% endfor %} #}
+
+    <table style="width: 100%; border-collapse: collapse; border: none;">
+        <tr>
+            <td class="text-right bold-text" style="padding: 5px; border: none !important;">Amount Before Tax:</td>
+            <td class="text-right" style="padding: 5px; border: none !important;">{{ doc.total }}</td>
+        </tr>
+
+        {% if total_igst > 0 %}
+        <tr>
+            <td class="text-right bold-text" style="padding: 5px; border: none !important;">IGST @ 18%:</td>
+            <td class="text-right" style="padding: 5px; border: none !important;">{{ '%.2f'|format(total_igst) }}</td>
+        </tr>
+        {% endif %}
+        {% if total_sgst > 0 %}
+        <tr>
+            <td class="text-right bold-text" style="padding: 5px; border: none !important;">SGST @ 9%:</td>
+            <td class="text-right" style="padding: 5px; border: none !important;">{{ '%.2f'|format(total_sgst) }}</td>
+        </tr>
+        {% endif %}
+        {% if total_cgst > 0 %}
+        <tr>
+            <td class="text-right bold-text" style="padding: 5px; border: none !important;">CGST @ 9%:</td>
+            <td class="text-right" style="padding: 5px; border: none !important;">{{ '%.2f'|format(total_cgst) }}</td>
+        </tr>
+        {% endif %}
+        
+        <!-- Attempt to detect shipping charges -->
+        {% set ns = namespace(total_shipping=0) %}
+        {% for tax in doc.taxes %}
+            {% if tax.charge_type == "Actual" %}
+                {% set ns.total_shipping = ns.total_shipping + tax.tax_amount %}
+            {% endif %}
+        {% endfor %}
+        
+        <tr>
+            <td class="text-right bold-text" style="padding: 5px; border: none !important;">
+                Shipping Charges:
+            </td>
+            <td class="text-right" style="padding: 5px; border: none !important;">
+                {{ '%.2f'|format(ns.total_shipping) }}
+            </td>
+        </tr>
+
+    </table>
+</td>
+
+    </tr>
+</table>
+    <!-- Grand Total -->
+    <table>
+        <tr>
+            <td class="text-right bold-text" style="padding: 5px; font-size: 15px;">Total Amount :-  {{ doc.grand_total }}</td> 
+        </tr>
+    </table>
+    
+    <!-- Amount in Words -->
+    <table>
+        <tr>
+            <td><strong>IN WORDS: </strong>{{ doc.in_words }}</td>
+        </tr>
+    </table>
+
+    <!-- Footer -->
+    <table>
+        <tr>
+            <td style="width: 30%; text-align: center;">
+                <p><strong>Checked By</strong></p><br><br><br>
+            </td>
+            <td style="width: 30%; text-align: center;">
+                <p><strong>Prepared By</strong></p><br><br><br>
+            </td>
+            <td style="width: 40%; text-align: center;">
+                <p><strong>For SONALI WIRES LLP</strong></p><br><br><br><br>
+                <p><strong>Authorized Signatory</strong></p>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

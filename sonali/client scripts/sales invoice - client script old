@@ -1,0 +1,136 @@
+frappe.ui.form.on('Sales Invoice', {
+    after_save: function(frm) {
+        console.log("After Save triggered for Sales Invoice:", frm.doc.name);
+
+        // Flag to ensure the form is saved only once
+        if (frm.is_saved) return;
+
+        // Set the flag to true to prevent repeated saves
+        frm.is_saved = true;
+
+        frappe.call({
+            method: "sonali.custom_functions.get_delivery_note_weights.get_delivery_note_weights",
+            args: {
+                sales_invoice: frm.doc.name
+            },
+            callback: function(response) {
+                if (response.message && response.message.updated_items) {
+
+                    let items_map = {};
+
+                    // Log updated_items to debug missing fields
+                    console.log("Updated Items:", response.message.updated_items);
+
+                    response.message.updated_items.forEach(item => {
+                        let key = item.item_code + '-' + (item.uom || '');
+
+                        if (items_map[key]) {
+                            items_map[key].qty += item.qty || 0;
+                            items_map[key].custom_weight_in_kg += item.custom_weight_in_kg || 0;
+                            items_map[key].custom_length_in_meter += item.custom_length_in_meter || 0;
+                        } else {
+                            items_map[key] = {
+                                item_code: item.item_code,
+                                uom: item.uom || 'Nos',  // Default UOM, ensure this is a valid UOM in your system
+                                qty: item.qty || 0,
+                                custom_weight_in_kg: item.custom_weight_in_kg || 0,
+                                custom_length_in_meter: item.custom_length_in_meter || 0,
+                                delivery_note: item.delivery_note
+                            };
+                        }
+                    });
+
+                    // ⚡ Clear items properly
+                    frm.clear_table("items");
+
+                    // Add merged items
+                    for (let key in items_map) {
+                        let merged_item = items_map[key];
+
+                        // Ensure both item_code and uom are provided
+                        if (!merged_item.item_code || !merged_item.uom) {
+                            console.log("Skipping row: Missing item_code or uom", merged_item);
+                            continue; // Skip if mandatory fields are missing
+                        }
+
+                        // Fetch item details to get the item_name and validate UOM
+                        frappe.call({
+                            method: "frappe.client.get",
+                            args: {
+                                doctype: "Item",
+                                name: merged_item.item_code
+                            },
+                            callback: function(item_details) {
+                                if (item_details.message) {
+                                    // Set the item_name from the Item document
+                                    merged_item.item_name = item_details.message.item_name || merged_item.item_code;
+
+                                    // Set the income account as "Sales - S"
+                                    let income_account = "Sales - S";  // Corrected income account
+
+                                    let child = frm.add_child("items");
+                                    child.item_code = merged_item.item_code;
+                                    child.item_name = merged_item.item_name;  // Set the item_name here
+                                    // child.qty = merged_item.qty;
+                                    child.custom_weight_in_kg = merged_item.custom_weight_in_kg;
+                                    child.custom_length_in_meter = merged_item.custom_length_in_meter;
+                                    console.log((merged_item.qty / merged_item.custom_weight_in_kg));
+                                    if(merged_item.custom_weight_in_kg > 0)
+                                    {
+                                        child.qty = merged_item.custom_weight_in_kg;
+                                        child.uom = "Kg";
+                                        child.conversion_factor = (merged_item.qty / merged_item.custom_weight_in_kg);
+                                    }
+                                    else if(merged_item.custom_length_in_meter > 0)
+                                    {
+                                        child.qty = merged_item.custom_length_in_meter;
+                                        child.uom = "Meter";
+                                        child.conversion_factor = (merged_item.qty / merged_item.custom_length_in_meter);
+                                    }
+                                    child.delivery_note = merged_item.delivery_note;
+                                    child.rate = 0;
+                                    child.income_account = income_account;  // Set the corrected income account here
+
+                                    frm.refresh_field("items");
+                                } else {
+                                    console.log("Item details not found for item_code:", merged_item.item_code);
+                                }
+                            }
+                        });
+                    }
+
+                    // ⚡ Force save once after all updates
+                    frm.save(); // This will trigger save once after the items are processed
+                }
+            }
+        });
+    }
+});
+
+frappe.ui.form.on('Sales Invoice Item', {
+    custom_rate_per_kg: function(frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+        if (row.qty && row.custom_weight_in_kg) {
+            let rate = (row.custom_weight_in_kg * row.custom_rate_per_kg) / row.qty;
+
+            let rate_fixed = Math.floor(rate * 1000) / 1000;
+            let last_digit = Math.ceil((rate * 10000) % 10);
+
+            let final_rate = rate_fixed + (last_digit / 10000);
+            frappe.model.set_value(cdt, cdn, 'rate', final_rate);
+        }
+    },
+
+    custom_rate_per_meter: function(frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+        if (row.qty && row.custom_length_in_meter) {
+            let rate = (row.custom_length_in_meter * row.custom_rate_per_meter) / row.qty;
+
+            let rate_fixed = Math.floor(rate * 1000) / 1000;
+            let last_digit = Math.ceil((rate * 10000) % 10);
+
+            let final_rate = rate_fixed + (last_digit / 10000);
+            frappe.model.set_value(cdt, cdn, 'rate', final_rate);
+        }
+    }
+});

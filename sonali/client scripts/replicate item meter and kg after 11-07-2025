@@ -1,0 +1,60 @@
+frappe.ui.form.on('Item', {
+    refresh: function(frm) {
+        // Add custom "METER" and "KG" buttons to the Item form
+        frm.add_custom_button(__('METER'), function() {
+            create_item_with_suffix(frm, 'METER');
+        });
+
+        frm.add_custom_button(__('KG'), function() {
+            create_item_with_suffix(frm, 'KG');
+        });
+    }
+});
+
+// Function to create a new item with the suffix, item group change, and UOM update
+function create_item_with_suffix(frm, suffix) {
+    // Replicate the current item and modify necessary fields
+    let new_item = frappe.model.copy_doc(frm.doc);
+
+    // Update basic fields
+    new_item.item_code = frm.doc.item_code + ' - ' + suffix;
+    new_item.item_name = frm.doc.item_name + ' - ' + suffix;
+    new_item.item_group = 'Sub Assemblies'; // Change item group
+
+    // Update UOM fields
+    new_item.stock_uom = suffix;
+    new_item.uoms = [{
+        uom: suffix,
+        conversion_factor: 1
+    }];
+
+    // Clean up fields that shouldn't be copied
+    delete new_item.__unsaved;
+    delete new_item.name;
+
+    // Clear variant-related fields if the item is a variant
+    new_item.variant_of = null;
+    new_item.attributes = [];
+
+    // Optionally clear barcode and other unique fields
+    new_item.barcode = null;
+    new_item.default_code = null;
+
+    // Insert the cleaned-up new item
+    frappe.call({
+        method: "frappe.client.insert",
+        args: {
+            doc: new_item
+        },
+        callback: function(response) {
+            if (response.message) {
+                const new_doc = response.message;
+                frappe.msgprint(__('Item {0} created successfully!', [new_doc.item_code]));
+                frappe.set_route('Form', 'Item', new_doc.name);
+            }
+        },
+        error: function(error) {
+            frappe.msgprint(__('Error creating item: {0}', [error.message || "Unknown error"]));
+        }
+    });
+}
