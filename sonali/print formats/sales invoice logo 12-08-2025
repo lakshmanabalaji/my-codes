@@ -135,7 +135,8 @@
                 <strong>Date:</strong> {{ frappe.utils.formatdate(doc.posting_date, "dd-mm-yyyy") }}<br>
                 <strong>Vehicle No:</strong> {{ doc.vehicle_no }}<br>
                 <strong>Carrier Name:</strong> {{ doc.custom_carrier_name }}<br>
-                <strong>Freight Term:</strong> {{ doc.custom_freight_term }}
+                <strong>Freight Term:</strong> {{ doc.custom_freight_term }}<br>
+                <strong>Payment Term:</strong> {{ frappe.utils.date_diff(doc.due_date, doc.posting_date) }} days
             </td>
         </tr>
     </table>
@@ -317,7 +318,7 @@
     </table>
     
      <!-- Amount in Words -->
-    <table style=" border-collapse: collapse; border-style: hidden !important; border-top: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-top: 1px solid black !important; border-Bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
         <tr>
             <td><strong>IN WORDS: </strong> {{ doc.in_words.lower().replace("inr", "").replace(" and ", " ").replace(",", "").replace(" only", " rupees only").strip() }}</td>
         </tr>
@@ -337,20 +338,20 @@
     </table>
 
     <!-- Terms and Conditions -->
-    <table style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important;">
+    <table style=" border-collapse: collapse; border-style: hidden !important; border-bottom: 1px solid black !important; border-left: 1px solid black !important; border-right: 1px solid black !important; page-break-inside: avoid;">
         <tr>
             <td style="width: 70%; vertical-align: top;">
                 <p style="font-size: 15px !important; font-weight: bold;">Terms & Conditions:</p>
-                <ol style=" font-size: 10px !important; margin-top: 5px; padding-left: 2px; list-style-position: inside;">
-                    <li>NO CLAIMS ARE ENTERTAINED UNLESS BROUGHT TO OUR NOTICE WITHIN TWO DAYS ON RECEIPT OF GOODS.</li>
-                    <li>GOODS ONCE SOLD WILL NOT BE TAKEN BACK.</li>
-                    <li>INTEREST @ 24% WILL BE CHARGED ON OVERDUE PAYMENT.</li>
-                    <li>WE ARE NOT RESPONSIBLE FOR BREAKAGE & DAMAGE IN TRANSIT.</li>
-                    <li>TRANSIT INSURANCE IF ANY IS TO BE TAKEN BY THE BUYER.</li>
-                    <li>ANY DISPUTES ARISING ARE SUBJECT TO COIMBATORE JURISDICTION.</li>
+                <ol style=" font-size: 12px !important; margin-top: 5px; padding-left: 2px; list-style-position: inside; page-break-inside: avoid;">
+                    <li>No claims are entertained unless brought to our notice within two days on receipt of goods.</li>
+                    <li>Goods once sold will not be taken back.</li>
+                    <li>Interest @ 24% will be charged on overdue payment.</li>
+                    <li>We are not responsible for breakage & damage in transit.</li>
+                    <li>Transit insurance if any is to be taken by the buyer.</li>
+                    <li>Any disputes arising are subject to Coimbatore jurisdiction.</li>
                 </ol>
             </td>
-            <td style="width: 30%; text-align: center; font-size: 10px !important;">
+            <td style="width: 30%; text-align: center; font-size: 10px !important; page-break-inside: avoid;">
                 <p><strong>For SONALI WIRES LLP</strong></p><br><br><br><br><br><br><br><br><br>
                 <p><strong>Authorized Signatory</strong></p>
             </td>

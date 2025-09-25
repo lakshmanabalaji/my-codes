@@ -1,0 +1,36 @@
+SELECT
+    i.name AS "Item Code:Link/Item:150",
+    i.sales_uom AS "UOM:Link/UOM:80",
+    SUM(
+        CASE
+            WHEN i.sales_uom = 'Kg' THEN IFNULL(sn.custom_weight, 0)
+            WHEN i.sales_uom = 'Meter' THEN IFNULL(sn.custom_length, 0)
+            WHEN i.sales_uom = 'Box' 
+                THEN CASE 
+                        WHEN IFNULL(b.actual_qty, 0) > 0 THEN 1 
+                        ELSE 0 
+                     END
+            ELSE 0
+        END
+    ) AS "Total Qty:Float:120"
+FROM
+    `tabItem` i
+LEFT JOIN
+    `tabSerial No` sn 
+        ON sn.item_code = i.name 
+       AND sn.status = 'Active'
+LEFT JOIN
+    `tabStock Ledger Entry` sle 
+        ON sle.item_code = i.name 
+       AND sle.serial_no = sn.name 
+       AND sle.is_cancelled = 0
+LEFT JOIN
+    `tabBin` b 
+        ON b.item_code = i.name
+WHERE
+    i.item_group = 'products'
+    AND i.item_name NOT IN ('COPPER SCRAP', 'PVC SCRAP')
+GROUP BY
+    i.name, i.item_name, i.sales_uom
+ORDER BY
+    i.name;

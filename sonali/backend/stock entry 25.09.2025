@@ -1,0 +1,189 @@
+import frappe
+import time
+import re
+
+@frappe.whitelist()
+def create_and_submit_stock_entry(item_code, weight, batch_id=None):
+    item_kg = find_kg_item(item_code)
+    company = "Sonali Wires LLP"
+    try:
+        if item_kg:
+            doc = frappe.get_doc({
+                "doctype": "Stock Entry",
+                "stock_entry_type": "Repack",
+                "company": company,
+                "items": [
+                    {
+                        "item_code": item_kg,
+                        "qty": weight,
+                        "s_warehouse": "Stores - S",
+                        "use_serial_batch_fields": 1,
+                        "batch_no": batch_id   # ✅ force selected batch
+                    },
+                    {
+                        "item_code": item_code,
+                        "qty": 1,
+                        "t_warehouse": "Stores - S"
+                    }
+                ]
+            })
+            doc.insert(ignore_permissions=True)  # Insert into Draft state
+            doc.submit()  # Submit the document
+
+            # Fetch Generated Serial Number
+            serial_nos = []
+            attempts = 0
+            while attempts < 5:
+                serial_nos = frappe.db.get_list(
+                    "Serial No",
+                    filters={"item_code": item_code, "purchase_document_no": doc.name},
+                    pluck="name"
+                )
+                if serial_nos:  # If serial number found, break the loop
+                    break
+                time.sleep(0.3)  # Wait for 0.3 seconds before retrying
+                attempts += 1
+
+            return {"name": doc.name, "status": "Submitted", "serial_numbers": serial_nos}
+        else:
+            return {"error": f"No KG item found for {item_code}"}
+    except Exception as e:
+        frappe.log_error(f"Stock Entry Error: {str(e)}")
+        return {"error": str(e)}
+
+
+@frappe.whitelist()
+def find_kg_item(item_code):
+    possible_kg_codes = [
+        f"{item_code}-KG",
+        f"{item_code} - KG"
+    ]
+    for code in possible_kg_codes:
+        kg_item = frappe.db.get_value(
+            "Item",
+            {"item_code": ["like", f"%{code}%"], "disabled": 0},
+            "item_code"
+        )
+        if kg_item:
+            return kg_item
+    return None
+
+
+@frappe.whitelist()
+def create_and_submit_stock_entry_meter(item_code, length, batch_id=None):
+    meter_item = find_meter_item(item_code)
+    try:
+        if meter_item:
+            doc = frappe.get_doc({
+                "doctype": "Stock Entry",
+                "stock_entry_type": "Repack",
+                "items": [
+                    {
+                        "item_code": meter_item,
+                        "qty": length,
+                        "s_warehouse": "Stores - S",
+                        "batch_no": batch_id   # ✅ force selected batch if provided
+                    },
+                    {
+                        "item_code": item_code,
+                        "qty": 1,
+                        "t_warehouse": "Stores - S"
+                    }
+                ]
+            })
+            doc.insert(ignore_permissions=True)  # Insert into Draft state
+            doc.submit()  # Submit the document
+
+            # Fetch Generated Serial Number
+            serial_nos = []
+            attempts = 0
+            while attempts < 5:
+                serial_nos = frappe.db.get_list(
+                    "Serial No",
+                    filters={"item_code": item_code, "purchase_document_no": doc.name},
+                    pluck="name"
+                )
+                if serial_nos:  # If serial number found, break the loop
+                    break
+                time.sleep(0.3)  # Wait for 0.3 seconds before retrying
+                attempts += 1
+
+            return {"name": doc.name, "status": "Submitted", "serial_numbers": serial_nos}
+        else:
+            return {"error": f"No METER item found for {item_code}"}
+    except Exception as e:
+        frappe.log_error(f"Stock Entry Error: {str(e)}")
+        return {"error": str(e)}
+
+
+@frappe.whitelist()
+def find_meter_item(item_code):
+    possible_meter_codes = [
+        f"{item_code}-METER",
+        f"{item_code} - METER"
+    ]
+    for code in possible_meter_codes:
+        meter_item = frappe.db.get_value(
+            "Item",
+            {"item_code": ["like", f"%{code}%"], "disabled": 0},
+            "item_code"
+        )
+        if meter_item:
+            actual_qty = frappe.db.get_value(
+                "Bin",
+                {"item_code": meter_item, "warehouse": "Stores - S"},
+                "actual_qty"
+            )
+            if actual_qty and actual_qty > 0:
+                return meter_item
+    return {"error": f"No METER item with stock found for {item_code}"}
+
+
+@frappe.whitelist()
+def get_batches_for_output_item(output_item_code):
+    """
+    Given an output item like 'SWW 1.10/1.50', try to find the corresponding
+    KG item (e.g. 'SWW 1.10/1.50 - KG' or 'SWW 1.10/1.50-KG') and return its batches.
+    """
+    if not output_item_code:
+        return []
+
+    output_item_code = output_item_code.strip()
+    kg_item_code = None
+
+    candidates = [
+        f"{output_item_code} - KG",
+        f"{output_item_code}-KG",
+        f"{output_item_code} -Kg",
+        f"{output_item_code}-Kg",
+        f"{output_item_code} - kg",
+        f"{output_item_code}- kg"
+    ]
+
+    for cand in candidates:
+        kg_item = frappe.db.exists("Item", {"item_code": cand, "disabled": 0})
+        if kg_item:
+            kg_item_code = cand
+            break
+    else:
+        for cand in candidates:
+            kg_item = frappe.db.get_value("Item", {"item_code": ["like", f"%{cand}%"], "disabled": 0}, "item_code")
+            if kg_item:
+                kg_item_code = kg_item
+                break
+        else:
+            if re.search(r"-\s*kg\b", output_item_code, flags=re.IGNORECASE):
+                kg_item_code = output_item_code
+
+    if not kg_item_code:
+        return []
+
+    batches = frappe.get_all(
+        "Batch",
+        filters={"item": kg_item_code, "disabled": 0 ,"batch_qty": [">", 0]},
+        fields=["name"],
+        order_by="creation desc",
+        limit_page_length=100
+    )
+
+    return [b.get("name") for b in batches] if batches else []

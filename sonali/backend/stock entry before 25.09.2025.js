@@ -4,11 +4,13 @@ import time
 @frappe.whitelist()
 def create_and_submit_stock_entry(item_code, weight):
     item_kg = find_kg_item(item_code)
+    company = "Sonali Wires LLP"
     try:
         if item_kg:
             doc = frappe.get_doc({
                 "doctype": "Stock Entry",
                 "stock_entry_type": "Repack",
+                "company": company,
                 "items": [
                     {
                         "item_code": item_kg,
@@ -47,38 +49,23 @@ def create_and_submit_stock_entry(item_code, weight):
         return {"error": str(e)}
 
 
+
 @frappe.whitelist()
 def find_kg_item(item_code):
-    """
-    Finds the corresponding KG item for the given item_code in the Item doctype.
-    Returns a variant if the matched KG item has variants.
-    """
     possible_kg_codes = [
         f"{item_code}-KG",
         f"{item_code} - KG"
     ]
-
-    # Check if a non-variant KG item exists
-    kg_item = frappe.db.get_value("Item", {"item_code": ["in", possible_kg_codes], "has_variants": 0}, "item_code")
-    if kg_item:
-        return kg_item
-
-    # Check if item_code is a variant, get its template
-    template_item = frappe.db.get_value("Item", item_code, "variant_of")
-    if template_item:
-        possible_template_kg_codes = [
-            f"{template_item}-KG",
-            f"{template_item} - KG"
-        ]
-
-        # Get template item
-        template_kg_item = frappe.db.get_value("Item", {"item_code": ["in", possible_template_kg_codes]}, "name")
-        if template_kg_item:
-            # Get one variant from this template
-            variant = frappe.db.get_value("Item", {"variant_of": template_kg_item}, "name")
-            if variant:
-                return variant
-
+    for code in possible_kg_codes:
+        kg_item = frappe.db.get_value(
+            "Item",
+            {
+                "item_code": ["like", f"%{code}%"],"disabled": 0,
+            },
+            "item_code"
+        )
+        if kg_item:
+            return kg_item
     return None
 
 
@@ -130,34 +117,28 @@ def create_and_submit_stock_entry_meter(item_code, length):
 
 @frappe.whitelist()
 def find_meter_item(item_code):
-    """
-    Finds the corresponding METER item for the given item_code in the Item doctype.
-    Returns a variant if the matched item is a template.
-    """
     possible_meter_codes = [
         f"{item_code}-METER",
         f"{item_code} - METER"
     ]
-
-    # Check if a non-variant METER item exists
-    meter_item = frappe.db.get_value("Item", {"item_code": ["in", possible_meter_codes], "has_variants": 0}, "item_code")
-    if meter_item:
-        return meter_item
-
-    # Check if item_code is a variant, get its template
-    template_item = frappe.db.get_value("Item", item_code, "variant_of")
-    if template_item:
-        possible_template_meter_codes = [
-            f"{template_item}-METER",
-            f"{template_item} - METER"
-        ]
-
-        # Get template meter item
-        template_meter_item = frappe.db.get_value("Item", {"item_code": ["in", possible_template_meter_codes]}, "name")
-        if template_meter_item:
-            # Get one variant from this template
-            variant = frappe.db.get_value("Item", {"variant_of": template_meter_item}, "name")
-            if variant:
-                return variant
-
-    return None
+    for code in possible_meter_codes:
+        meter_item = frappe.db.get_value(
+            "Item",
+            {
+                "item_code": ["like", f"%{code}%"],
+                "disabled": 0
+            },
+            "item_code"
+        )
+        if meter_item:
+            actual_qty = frappe.db.get_value(
+                "Bin",
+                {
+                    "item_code": meter_item,
+                    "warehouse": "Stores - S"
+                },
+                "actual_qty"
+            )
+            if actual_qty and actual_qty > 0:
+                return meter_item
+    return {"error": f"No METER item with stock found for {item_code}"}
