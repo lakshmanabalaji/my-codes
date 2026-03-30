@@ -1,0 +1,74 @@
+<head>
+    <meta name="pdfkit-page-width" content="50mm"/>
+    <meta name="pdfkit-page-height" content="16mm"/>
+</head>
+
+<style>
+    .label-container {
+        display: flex;
+        flex-direction: column;
+        font-family: Arial, sans-serif;
+    }
+
+    .label-box {
+        width: 43mm;
+        height: 15.5mm;
+        margin-left: 6mm;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+        page-break-before: always;
+    }
+
+    @page {
+        size: 50mm 16mm;
+        margin: 0;
+    }
+
+    .label-content {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: left;
+    }
+
+    .label-text {
+        font-size: 9px;
+        font-weight: bold;
+        line-height: 1.4;
+    }
+
+    .barcode img {
+        width: 20mm;
+        height: 10mm;
+        object-fit: contain;
+    }
+</style>
+
+{% set serials = frappe.get_all(
+    "Serial No",
+    filters={"purchase_document_no": doc.name},
+    fields=["name", "item_code", "tare_weight", "creation"]
+) %}
+
+<div class="label-container">
+    {% for s in serials %}
+    <div class="label-box">
+        <div class="label-content">
+            <div class="label-text">
+                {{ frappe.utils.formatdate(s.creation, "dd/mm/yyyy") }}
+            </div>
+            <div class="label-text">
+                {{ s.item_code }}
+            </div>
+            <div class="label-text">
+                Tare Weight: {{ s.tare_weight or 0 }}
+            </div>
+        </div>
+        <div class="barcode">
+            <img src="https://barcode.tec-it.com/barcode.ashx?data={{ s.name }}&code=Code128&dpi=96">
+        </div>
+    </div>
+    {% endfor %}
+</div>
