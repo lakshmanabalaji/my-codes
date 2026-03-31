@@ -1,0 +1,251 @@
+// ==============================
+// FORM VIEW BUTTON
+// ==============================
+frappe.ui.form.on('Stock Entry', {
+    refresh(frm) {
+        frm.add_custom_button('QSE KG (WW)', () => {
+            open_qse_dialog();
+        });
+    }
+});
+
+
+// ==============================
+// LIST VIEW BUTTON
+// ==============================
+frappe.listview_settings['Stock Entry'] = frappe.listview_settings['Stock Entry'] || {};
+
+const old_onload = frappe.listview_settings['Stock Entry'].onload;
+
+frappe.listview_settings['Stock Entry'].onload = function(listview) {
+    if (old_onload) {
+        old_onload(listview);
+    }
+
+    if (!listview.page.qse_ww_added) {
+        listview.page.add_inner_button('QSE KG (WW)', function () {
+            open_qse_dialog();
+        });
+        
+        listview.page.qse_ww_added = true;
+    }
+};
+
+
+// ==============================
+// MAIN DIALOG
+// ==============================
+function open_qse_dialog() {
+    let d = new frappe.ui.Dialog({
+        title: 'QSE KG (WW)',
+        fields: [
+            { label: 'Scan Serial No', fieldname: 'serial_no', fieldtype: 'Data', reqd: 1 },
+            { label: 'Product Item', fieldname: 'item_code', fieldtype: 'Link', options: 'Item', read_only: 1 },
+            { label: 'Grade', fieldname: 'grade', fieldtype: 'Data', read_only: 1 },
+            { label: 'Gross Weight', fieldname: 'gross_weight', fieldtype: 'Float', reqd: 1 },
+            { label: 'Tare Weight', fieldname: 'tare_weight', fieldtype: 'Float', read_only: 1 },
+            { label: 'Net Weight', fieldname: 'net_weight', fieldtype: 'Float', read_only: 1 },
+            { label: 'Batch Id', fieldname: 'batch_id', fieldtype: 'Select', reqd: 1 }
+        ],
+
+        primary_action_label: 'Submit',
+
+        primary_action(values) {
+            if (!values.serial_no) {
+                frappe.msgprint("Scan Serial No");
+                return;
+            }
+
+            if (!values.gross_weight) {
+                frappe.msgprint("Enter Gross Weight");
+                return;
+            }
+
+            if (!values.batch_id) {
+                frappe.msgprint("Select Batch Id");
+                return;
+            }
+
+            d.get_primary_btn().addClass('disabled');
+            d.get_primary_btn().hide();
+
+            frappe.call({
+                method: "sonali.custom_functions.Stock_Entry.create_stock_entry_with_weights",
+                args: {
+                    serial_no: values.serial_no,
+                    gross_weight: values.gross_weight,
+                    tare_weight: values.tare_weight,
+                    net_weight: values.net_weight,
+                    grade: values.grade,
+                    batch_id: values.batch_id
+                },
+                freeze: true,
+                freeze_message: "Processing...",
+
+                callback: function (r) {
+                    if (!r.message) return;
+
+                    if (r.message.error) {
+                        frappe.msgprint(r.message.error);
+                        d.get_primary_btn().removeClass('disabled');
+                        d.get_primary_btn().show();
+                        return;
+                    }
+
+                    let serial_no = r.message.serial_no || "";
+
+                    // Auto update Serial No
+                    if (serial_no) {
+                        let today = new Date();
+                        let formatted_date =
+                            today.getDate().toString().padStart(2, '0') + "-" +
+                            (today.getMonth() + 1).toString().padStart(2, '0') + "-" +
+                            today.getFullYear();
+
+                        frappe.call({
+                            method: "frappe.client.set_value",
+                            args: {
+                                doctype: "Serial No",
+                                name: serial_no,
+                                fieldname: {
+                                    custom_weight: values.net_weight,
+                                    custom_mfgdate1: formatted_date
+                                }
+                            }
+                        });
+                    }
+                        d.hide();
+                    show_result_dialog(
+                        r.message.stock_entry,
+                        serial_no,
+                        values.net_weight
+                    );
+
+                    d.set_values({
+                        serial_no: "",
+                        item_code: "",
+                        grade: "",
+                        gross_weight: "",
+                        tare_weight: "",
+                        net_weight: "",
+                        batch_id: ""
+                    });
+
+                    setTimeout(() => {
+                        d.fields_dict.serial_no.$input.focus();
+                    }, 300);
+                }
+            });
+        }
+    });
+
+    setTimeout(() => {
+        d.fields_dict.serial_no.$input.focus();
+    }, 300);
+
+    d.fields_dict.serial_no.df.onchange = function () {
+        let serial = d.get_value('serial_no');
+        if (!serial) return;
+
+        frappe.db.get_doc('Serial No', serial).then(sn => {
+            if (!sn.product_item) {
+                frappe.msgprint("Product Item not set");
+                d.set_value('serial_no', '');
+                return;
+            }
+
+            d.set_value('item_code', sn.product_item);
+
+            frappe.db.get_value('Item', sn.product_item, 'grade')
+                .then(r => d.set_value('grade', r.message.grade || ""));
+
+            let tare = sn.tare_weight || 0;
+            d.set_value('tare_weight', tare);
+
+            calculate_net();
+
+            frappe.call({
+                method: "sonali.custom_functions.Stock_Entry.get_batches_for_output_item",
+                args: { output_item_code: sn.product_item },
+                callback: function (res) {
+                    let batch_field = d.get_field("batch_id");
+                    let options = (res.message || []).map(name => name);
+                    options.unshift("");
+                    batch_field.df.options = options;
+                    batch_field.refresh();
+                }
+            });
+
+            setTimeout(() => {
+                d.fields_dict.gross_weight.$input.focus();
+            }, 200);
+        }).catch(() => {
+            frappe.msgprint("Invalid Serial No");
+            d.set_value('serial_no', '');
+        });
+    };
+
+    function calculate_net() {
+        let gross = d.get_value('gross_weight') || 0;
+        let tare = d.get_value('tare_weight') || 0;
+        d.set_value('net_weight', gross - tare);
+    }
+
+    d.fields_dict.gross_weight.df.onchange = calculate_net;
+
+    d.show();
+}
+
+
+// ==============================
+// RESULT DIALOG (ALIGNED BUTTONS)
+// ==============================
+function show_result_dialog(stock_entry, serial_no, net_weight) {
+    let dialog = new frappe.ui.Dialog({
+        title: 'Result',
+        fields: [
+            { label: 'Stock Entry', fieldname: 'se', fieldtype: 'Data', default: stock_entry, read_only: 1 },
+            { label: 'New Serial No', fieldname: 'sn', fieldtype: 'Data', default: serial_no, read_only: 1 },
+            { label: 'Net Weight', fieldname: 'nw', fieldtype: 'Float', default: net_weight, read_only: 1 },
+            { fieldtype: 'HTML', fieldname: 'buttons' }
+        ]
+    });
+
+    dialog.show();
+
+    dialog.fields_dict.buttons.$wrapper.html(`
+        <div style="
+            margin-top:20px;
+            display:flex;
+            justify-content:flex-end;
+            gap:10px;
+        ">
+            <button class="btn btn-primary""
+                onclick="print_small('${serial_no}')">
+                Print Small Sticker
+            </button>
+
+            <button class="btn btn-primary"
+                onclick="print_big('${serial_no}')">
+                Print Big Sticker
+            </button>
+        </div>
+    `);
+}
+
+
+// ==============================
+// PRINT FUNCTIONS
+// ==============================
+
+// 🔵 BIG STICKER
+window.print_big = function(serial_no) {
+    let url = `/printview?doctype=Serial No&name=${serial_no}&format=${encodeURIComponent("qse ww big")}&no_letterhead=1`;
+    window.open(url, "_blank");
+};
+
+// ⚪ SMALL STICKER
+window.print_small = function(serial_no) {
+    let url = `/printview?doctype=Serial No&name=${serial_no}&format=${encodeURIComponent("qse ww small sticker")}&no_letterhead=1`;
+    window.open(url, "_blank");
+};
