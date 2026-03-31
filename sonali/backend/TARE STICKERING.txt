@@ -1,0 +1,106 @@
+frappe.listview_settings['Reel Type'] = {
+    onload(listview) {
+        listview.page.add_inner_button('Reel Tag Printing', () => {
+            open_tare_dialog();
+        });
+    }
+};
+
+function open_tare_dialog() {
+    let d = new frappe.ui.Dialog({
+        title: 'Tare Printing',
+        fields: [
+            {
+                label: 'Tare Type',
+                fieldname: 'item_code',
+                fieldtype: 'Link',
+                options: 'Item',
+                reqd: 1,
+                get_query: () => ({ filters: { has_serial_no: 1 , item_group: "REELS" } })
+            },
+            {
+                label: 'Product Item',
+                fieldname: 'product_item',
+                fieldtype: 'Link',
+                options: 'Item',
+                reqd: 1
+            },
+            {
+                label: 'Tare Weight',
+                fieldname: 'tare_weight',
+                fieldtype: 'Float',
+                reqd: 1
+            },
+            {
+                label: 'Quantity',
+                fieldname: 'qty',
+                fieldtype: 'Int',
+                default: 1,
+                reqd: 1
+            }
+        ],
+        primary_action_label: 'Create',
+        primary_action: async function(values) {
+            try {
+                frappe.dom.freeze("Creating Reels...");
+
+                let res = await frappe.call({
+                    method: "sonali.custom_functions.Stock_Entry.create_stock_entry_with_reel",
+                    args: {
+                        item_code: values.item_code,
+                        qty: values.qty,
+                        tare_weight: values.tare_weight,
+                        product_item: values.product_item
+                    }
+                });
+
+                frappe.dom.unfreeze();
+                d.hide();
+
+                let data = res.message;
+                if (data.error) {
+                    frappe.msgprint(data.error);
+                    return;
+                }
+
+                let serials = data.serial_numbers || [];
+                let stock_entry = data.stock_entry;
+
+                let result_dialog = new frappe.ui.Dialog({
+                    title: 'Created Reels',
+                    fields: [{ fieldtype: 'HTML', fieldname: 'data' }]
+                });
+
+                let html = `
+                    <div style="max-height:300px;overflow:auto">
+                        <ul>
+                            ${serials.map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <br>
+                    <button class="btn btn-primary"
+                        onclick="print_serials('${stock_entry}')">
+                        Print
+                    </button>
+                `;
+
+                result_dialog.fields_dict.data.$wrapper.html(html);
+                result_dialog.show();
+
+            } catch (err) {
+                frappe.dom.unfreeze();
+                console.error(err);
+                frappe.msgprint("Error: " + err.message);
+            }
+        }
+    });
+
+    d.show();
+}
+
+// ✅ Print all serials from Stock Entry in one window
+window.print_serials = function (stock_entry_name) {
+    let print_format = "TARE PRINT 1";
+    let url = `/printview?doctype=Stock Entry&name=${stock_entry_name}&format=${encodeURIComponent(print_format)}&no_letterhead=1`;
+    window.open(url, "_blank");
+};
