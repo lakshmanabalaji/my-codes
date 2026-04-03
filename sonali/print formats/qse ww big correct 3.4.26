@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+@page {
+    size: 100mm 50mm;
+    margin: 0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/* 🔥 STRICT SINGLE PAGE CONTROL */
+.sticker {
+    width: 100mm;
+    height: 50mm;
+    box-sizing: border-box;
+    padding: 2mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden; /* VERY IMPORTANT */
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+td {
+    font-size: 10px;   /* 🔥 reduced */
+    padding: 0px 2px;
+    line-height: 7px;
+    border-top: 1px solid black;
+    border-bottom: 1px solid black;
+}
+
+td:first-child {
+    border-right: 1px solid black;
+    width: 45%;
+    font-weight: bold;
+}
+
+/* 🔥 Barcode tightly controlled */
+.barcode {
+    text-align: center;
+    margin-top: 1mm;
+}
+
+.barcode img {
+    width: 55%;
+    height: 11mm; /* 🔥 reduced */
+}
+</style>
+</head>
+
+<body>
+
+<div class="sticker">
+    
+    <table>
+        <tr>
+            <td>ITEM</td>
+            <td>{{ doc.item_name }}</td>
+        </tr>
+        <tr>
+            <td>GRADE</td>
+            <td>
+                {{ frappe.db.get_value("Item", doc.item_code, "grade") or "" }}
+            </td>
+        </tr>
+
+        <tr>
+            <td>GROSS WEIGHT</td>
+            <td>{{ "{:.3f}".format((doc.gross_weight or 0) | float) }}</td>
+        </tr>
+
+        <tr>
+            <td>TARE WEIGHT</td>
+            <td>{{ "{:.3f}".format((doc.tare_weight or 0) | float) }}</td>
+        </tr>
+
+        <tr>
+            <td>NET WEIGHT</td>
+            <td>{{ "{:.3f}".format((doc.net_weight or 0) | float) }}</td>
+        </tr>
+
+        <tr>
+            <td>SERIAL NO</td>
+            <td>{{ doc.name }}</td>
+        </tr>
+
+        <tr>
+            <td>DATE</td>
+            <td>{{ frappe.utils.nowdate() }}</td>
+        </tr>
+    </table>
+
+    <div class="barcode">
+        <img src="https://barcode.tec-it.com/barcode.ashx?data={{ doc.name }}&code=Code128&dpi=96">
+    </div>
+
+</div>
+
+</body>
+</html>
