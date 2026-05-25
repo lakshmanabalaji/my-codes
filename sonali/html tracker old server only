@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Salesperson Tracker</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/@mapbox/polyline@1.1.1/src/polyline.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--c1:#1a56db;--cg:#16a34a;--cr:#dc2626;--cy:#d97706;--bg:#f1f5f9;--card:#fff;--text:#111827;--text2:#6b7280;--border:#e5e7eb}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);min-height:100vh}
+.app{max-width:480px;margin:0 auto;padding:12px 12px 40px}
+.header{background:linear-gradient(135deg,#1a56db,#0f3d9e);color:#fff;border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 12px rgba(26,86,219,.25)}
+.header h2{font-size:16px;font-weight:700;letter-spacing:.3px}
+.header .sub{font-size:11px;opacity:.75;margin-top:2px}
+.hright{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.hbadge{background:rgba(255,255,255,.15);border-radius:20px;padding:3px 10px;font-size:11px}
+.user-pill{background:rgba(255,255,255,.2);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600}
+.tabs{display:flex;background:#e2e8f0;border-radius:12px;padding:3px;margin-bottom:10px;gap:2px}
+.tab{flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:13px;cursor:pointer;background:transparent;color:var(--text2);font-weight:500;transition:.15s}
+.tab.active{background:#fff;color:var(--c1);box-shadow:0 1px 4px rgba(0,0,0,.12);font-weight:600}
+.section{display:none}.section.active{display:block}
+.card{background:var(--card);border-radius:14px;border:1px solid var(--border);margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card-header{padding:11px 14px;font-size:13px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:#fafafa}
+.card-body{padding:14px}
+.sicon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.btn{border:none;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;width:100%;letter-spacing:.2px}
+.btn-green{background:var(--cg);color:#fff;margin-bottom:8px;box-shadow:0 2px 8px rgba(22,163,74,.3)}
+.btn-red{background:var(--cr);color:#fff;margin-bottom:8px;box-shadow:0 2px 8px rgba(220,38,38,.25)}
+.btn-blue{background:var(--c1);color:#fff;box-shadow:0 2px 8px rgba(26,86,219,.25)}
+.btn-gray{background:#e5e7eb;color:#9ca3af;cursor:not-allowed;box-shadow:none}
+.btn-sm{padding:7px 14px;font-size:12px;width:auto}
+.input-row{margin-bottom:10px}
+.input-row label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px;font-weight:500}
+.input-row input,.input-row select,.input-row textarea{width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff;color:var(--text);outline:none;transition:.15s}
+.input-row input:focus,.input-row select:focus,.input-row textarea:focus{border-color:var(--c1);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+.input-row textarea{min-height:64px;resize:vertical}
+.att-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.att-btn{border-radius:12px;padding:18px 8px;font-size:22px;font-weight:600;cursor:pointer;transition:.2s;text-align:center;border:2px solid transparent;width:100%;background:transparent}
+.att-btn .lbl{font-size:12px;font-weight:600;margin-top:5px}
+.att-btn.chosen{box-shadow:0 0 0 3px var(--c1);transform:scale(1.04)}
+.att-btn:active{transform:scale(.97)}
+.wtype-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}
+.wtype-btn{border:1.5px solid #dbeafe;border-radius:9px;padding:9px 6px;font-size:12px;font-weight:500;background:#f8faff;color:#374151;cursor:pointer;transition:.15s;text-align:center;width:100%}
+.wtype-btn.sel{background:var(--c1);color:#fff;border-color:var(--c1);box-shadow:0 2px 6px rgba(26,86,219,.2)}
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.stat-box{background:#f8faff;border-radius:10px;padding:10px;text-align:center;border:1px solid #dbeafe}
+.stat-num{font-size:18px;font-weight:700;color:var(--c1)}
+.stat-label{font-size:10px;color:var(--text2);margin-top:2px}
+.loc-log-card{background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:1px solid #bfdbfe;border-radius:12px;padding:13px;margin-bottom:8px}
+.loc-log-card:last-child{margin-bottom:0}
+.loc-label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.loc-coords{font-size:13px;font-weight:500;color:var(--text);margin-top:1px}
+.loc-dist-badge{display:inline-flex;align-items:center;gap:5px;background:#1a56db;color:#fff;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;margin-top:4px}
+.ts-card{background:#f8faff;border:1px solid #dbeafe;border-radius:10px;padding:12px;margin-bottom:8px}
+.ts-badge{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;background:#dbeafe;color:#1d4ed8;margin-bottom:5px}
+.sync{font-size:11px;margin-top:6px;padding:4px 9px;border-radius:6px;display:inline-block}
+.sync-p{background:#fef9c3;color:#a16207}
+.sync-ok{background:#dcfce7;color:#15803d}
+.sync-err{background:#fee2e2;color:#b91c1c}
+#map{height:300px;width:100%}
+.map-legend{display:flex;gap:14px;padding:8px 14px;font-size:11px;color:#6b7280;border-top:1px solid var(--border)}
+.lbox{background:#f8faff;border:1px solid #dbeafe;border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.7}
+.lbox strong{color:var(--text);font-size:13px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 22px;border-radius:12px;font-size:13px;z-index:9999;opacity:0;transition:.3s;white-space:nowrap;max-width:88vw;overflow:hidden;text-overflow:ellipsis;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.toast.show{opacity:1}
+.pulse{animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.empty{color:#9ca3af;font-size:13px;text-align:center;padding:14px 8px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <h2>📍 Salesperson Tracker</h2>
+    <div class="sub" id="hdr-date"></div>
+  </div>
+  <div class="hright">
+    <div class="hbadge" id="hdr-status">● Connecting...</div>
+    <div class="user-pill" id="hdr-user">Loading...</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="showTab('attend',this)">Attendance</button>
+  <button class="tab" onclick="showTab('location',this)">Location</button>
+  <button class="tab" onclick="showTab('timesheet',this)">Timesheet</button>
+</div>
+
+<!-- ══════════════════════════════
+     ATTENDANCE TAB
+══════════════════════════════ -->
+<div id="attend" class="section active">
+  <div class="card">
+    <div class="card-header"><div class="sicon" style="background:#eff6ff">👤</div>Mark Today's Attendance</div>
+    <div class="card-body">
+      <div style="display:flex;align-items:center;gap:12px;padding:4px 0 14px">
+        <div id="att-avatar" style="width:44px;height:44px;border-radius:50%;background:var(--c1);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">SP</div>
+        <div>
+          
+          <div id="att-empname" style="font-size:15px;font-weight:700;color:var(--text)">—</div>
+          <div id="att-state" style="font-size:12px;color:var(--text2);margin-top:2px">Not marked today</div>
+          <div class="input-row" style="margin-top:12px">
+          <label>Select Employee</label>
+          <select id="employee-select" onchange="selectEmployee()">
+            <option value="">Loading employees...</option>
+          </select>
+        </div>
+        </div>
+      </div>
+      <div class="att-grid">
+        <button class="att-btn" id="btn-Present"  onclick="markAttend('Present')"  style="background:#dcfce7;border-color:#86efac;color:#15803d">✅<div class="lbl">Present</div></button>
+        <button class="att-btn" id="btn-OnField"  onclick="markAttend('On Field')" style="background:#dbeafe;border-color:#93c5fd;color:#1d4ed8">📍<div class="lbl">On Field</div></button>
+        <button class="att-btn" id="btn-Leave"    onclick="markAttend('Leave')"    style="background:#fef9c3;border-color:#fde047;color:#a16207">🏖️<div class="lbl">Leave</div></button>
+        <button class="att-btn" id="btn-Absent"   onclick="markAttend('Absent')"   style="background:#fee2e2;border-color:#fca5a5;color:#b91c1c">❌<div class="lbl">Absent</div></button>
+      </div>
+      <div id="att-result" style="margin-top:12px;display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     LOCATION TAB
+══════════════════════════════ -->
+<div id="location" class="section">
+  <div class="card">
+    <div class="card-header"><div class="sicon" style="background:#fef9c3">📍</div>GPS Location Tracking</div>
+    <div class="card-body">
+      <div class="stat-row">
+        <div class="stat-box"><div class="stat-num" id="loc-from">—</div><div class="stat-label">Start captured</div></div>
+        <div class="stat-box"><div class="stat-num" id="loc-to">—</div><div class="stat-label">Stop captured</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-green" id="btn-loc-start" onclick="startTracking()" style="margin:0;flex:1">▶ Start</button>
+        <button class="btn btn-red btn-gray" id="btn-loc-stop" onclick="stopTracking()" disabled style="margin:0;flex:1">■ Stop</button>
+      </div>
+      <div class="lbox" id="loc-status">
+        <strong>GPS Status</strong><br>
+        <span id="gps-msg">Tap Start to begin tracking your location.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Map -->
+  <div class="card">
+    <div class="card-header" style="justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px"><div class="sicon" style="background:#eff6ff">🗺️</div>Route Map</div>
+      <button onclick="fitMap()" style="border:none;background:#eff6ff;color:var(--c1);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:500">⊞ Fit All</button>
+    </div>
+    <div id="map"></div>
+    <div class="map-legend">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;margin-right:4px;vertical-align:middle"></span>Start</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;margin-right:4px;vertical-align:middle"></span>Stop</span>
+      <span><span style="display:inline-block;width:16px;height:4px;background:#1a56db;margin-right:4px;vertical-align:middle;border-radius:2px"></span>Road route</span>
+    </div>
+  </div>
+
+  <!-- Location Logs -->
+  <div class="card">
+    <div class="card-header"><div class="sicon" style="background:#f0fdf4">📋</div>Session Logs</div>
+    <div class="card-body" id="loc-logs"><div class="empty">No sessions yet — start tracking to begin</div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     TIMESHEET TAB
+══════════════════════════════ -->
+<div id="timesheet" class="section">
+  <div class="card">
+    <div class="card-header"><div class="sicon" style="background:#fff7ed">📋</div>New Timesheet Entry</div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="input-row" style="margin:0">
+          <label>Date</label>
+          <input type="date" id="ts-date">
+        </div>
+        <div class="input-row" style="margin:0">
+          <label>Next Follow-up</label>
+          <input type="date" id="ts-followup">
+        </div>
+      </div>
+      <div class="input-row" style="margin-top:10px">
+        <label>Employee Name</label>
+        <input type="text" id="ts-emp" readonly>
+      </div>
+      <div class="input-row">
+        <label>Lead / Customer Name</label>
+        <input type="text" id="ts-customer" placeholder="Lead or customer name">
+      </div>
+      <div class="input-row">
+        <label>Work Type</label>
+        <div class="wtype-grid">
+          <button class="wtype-btn sel" onclick="selWT(this,'Call')">📞 Call</button>
+          <button class="wtype-btn" onclick="selWT(this,'Meeting')">🤝 Meeting</button>
+          <button class="wtype-btn" onclick="selWT(this,'Visit')">🚗 Visit</button>
+          <button class="wtype-btn" onclick="selWT(this,'Follow-up')">🔄 Follow-up</button>
+          <button class="wtype-btn" onclick="selWT(this,'Payment Collection')">💰 Payment Collection</button>
+          <button class="wtype-btn" onclick="selWT(this,'Sample Submission')">📦 Sample Submission</button>
+          <button class="wtype-btn" onclick="selWT(this,'Quotation Discussion')" style="grid-column:1/-1">📄 Quotation Discussion</button>
+        </div>
+      </div>
+      <div class="input-row">
+        <label>Remarks</label>
+        <textarea id="ts-remarks" placeholder="What happened during this visit / call..."></textarea>
+      </div>
+      <div class="input-row">
+        <label>Outcome / Next Action</label>
+        <textarea id="ts-outcome" placeholder="Outcome and what needs to happen next..." style="min-height:52px"></textarea>
+      </div>
+      <button class="btn btn-blue" onclick="submitTimesheet()">✓ Submit Timesheet</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="sicon" style="background:#f0fdf4">📄</div>Submitted Entries</div>
+    <div class="card-body" id="ts-log"><div class="empty">No entries yet</div></div>
+  </div>
+</div>
+
+</div><!-- /.app -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  CONFIG — replace with your actual Google Maps API key
+// ══════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════
+const S = {
+  user: null,
+  employee: null,
+  empId: null,
+  company: null,
+  currentTimesheet: null,
+  tracking: false,
+  startPoint: null,   // {lat, lon, time}
+  stopPoint:  null,   // {lat, lon, time}
+  workType: 'Call',
+  locLogs: [],
+  tsEntries: []
+};
+
+// ══════════════════════════════════════════════════════════
+//  UTILITIES
+// ══════════════════════════════════════════════════════════
+const now      = () => new Date();
+const todayISO = () => now().toISOString().slice(0,10);
+const fmtDT    = d  => d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+const fmtCoords= (lat,lon) => lat.toFixed(5)+'°N, '+lon.toFixed(5)+'°E';
+
+function toast(msg, dur=2800){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), dur);
+}
+
+function showTab(id, btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='location' && map) setTimeout(()=>map.invalidateSize(),120);
+}
+
+function haverMeters(lat1,lon1,lat2,lon2){
+  const R=6371000, r=Math.PI/180;
+  const dlat=(lat2-lat1)*r, dlon=(lon2-lon1)*r;
+  const a=Math.sin(dlat/2)**2+Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dlon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function haverKm(lat1,lon1,lat2,lon2){
+  return (haverMeters(lat1,lon1,lat2,lon2)/1000).toFixed(2);
+}
+
+function syncBadge(state, link=''){
+  if(state==='pending') return '<span class="sync sync-p">⏳ Saving to ERPNext...</span>';
+  if(state==='ok')      return '<span class="sync sync-ok">✅ Saved'+(link?' — <a href="'+link+'" target="_blank">Open</a>':'')+'</span>';
+  if(state==='err')     return '<span class="sync sync-err">❌ Save failed — stored locally</span>';
+  return '';
+}
+
+// ══════════════════════════════════════════════════════════
+//  FRAPPE / ERPNext — session-based (same-origin)
+// ══════════════════════════════════════════════════════════
+function getCsrf() {
+  return window.csrf_token || frappe.csrf_token || '';
+}
+
+async function saveDoc(doctype, doc){
+  const res = await fetch('/api/resource/'+encodeURIComponent(doctype),{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Frappe-CSRF-Token':getCsrf()},
+    credentials:'same-origin',
+    body: JSON.stringify({data: JSON.stringify(doc)})
+  });
+  const j = await res.json();
+  if(j.exc) throw new Error(j.exc);
+  return j;
+}
+
+async function updateDoc(doctype, name, doc){
+  const res = await fetch('/api/resource/'+encodeURIComponent(doctype)+'/'+encodeURIComponent(name),{
+    method:'PUT',
+    headers:{'Content-Type':'application/json','X-Frappe-CSRF-Token':getCsrf()},
+    credentials:'same-origin',
+    body: JSON.stringify({data: JSON.stringify(doc)})
+  });
+  const j = await res.json();
+  if(j.exc) throw new Error(j.exc);
+  return j;
+}
+
+async function getDoc(doctype, filters, fields){
+  const f  = encodeURIComponent(JSON.stringify(filters));
+  const fd = encodeURIComponent(JSON.stringify(fields));
+  const res = await fetch('/api/resource/'+encodeURIComponent(doctype)+'?filters='+f+'&fields='+fd+'&limit=100',{
+    credentials:'same-origin'
+  });
+  const j = await res.json();
+  return j.data || [];
+}
+
+// ══════════════════════════════════════════════════════════
+//  INIT — load logged-in user + employee
+// ══════════════════════════════════════════════════════════
+async function loadEmployees() {
+  try {
+    const rows = await getDoc(
+      'Employee',
+      [],
+      ['name', 'employee_name', 'company']
+    );
+
+    const sel = document.getElementById('employee-select');
+
+    sel.innerHTML = '<option value="">Select Employee</option>';
+
+    rows.forEach(emp => {
+      const opt = document.createElement('option');
+      opt.value = emp.name;
+      opt.textContent = `${emp.employee_name} (${emp.name})`;
+      opt.dataset.name = emp.employee_name;
+      opt.dataset.company = emp.company;
+      sel.appendChild(opt);
+    });
+
+  } catch (e) {
+    console.error("Employee load failed:", e);
+  }
+}
+
+function selectEmployee() {
+  const sel = document.getElementById('employee-select');
+  const opt = sel.options[sel.selectedIndex];
+
+  if (!sel.value) return;
+
+  S.empId = sel.value;
+  S.employee = opt.dataset.name;
+  S.company = opt.dataset.company;
+
+  document.getElementById('att-empname').textContent = S.employee;
+  document.getElementById('hdr-user').textContent = S.employee;
+  document.getElementById('ts-emp').value = S.employee;
+
+  const initials = S.employee
+    .split(' ')
+    .map(w => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  document.getElementById('att-avatar').textContent = initials;
+
+  checkTodayAttendance();
+
+  toast('Employee selected: ' + S.employee);
+}
+
+
+async function initUser() {
+  try {
+    const r = await fetch(
+      '/api/method/frappe.auth.get_logged_user',
+      { credentials: 'same-origin' }
+    );
+
+    const j = await r.json();
+
+    S.user = j.message;
+
+    document.getElementById('hdr-user').textContent = S.user;
+    document.getElementById('hdr-status').textContent = '● Online';
+
+    await loadEmployees();
+
+  } catch (e) {
+    document.getElementById('hdr-user').textContent = 'Not logged in';
+    document.getElementById('hdr-status').textContent = '● Offline';
+    console.warn('initUser:', e);
+  }
+}
+
+async function checkTodayAttendance() {
+  if (!S.empId) return;
+
+  try {
+    const res = await fetch(
+      '/api/method/frappe.client.get_list',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Frappe-CSRF-Token': getCsrf()
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          doctype: 'Attendance',
+          filters: {
+            employee: S.empId
+          },
+          fields: [
+            'name',
+            'status',
+            'attendance_date'
+          ],
+          limit_page_length: 20
+        })
+      }
+    );
+
+    const j = await res.json();
+
+    if (j.exc) {
+      console.error(j);
+      return;
+    }
+
+    const rows = j.message || [];
+    const today = todayISO();
+
+    const row = rows.find(r => r.attendance_date === today);
+
+    if (!row) {
+      document.getElementById('att-state').textContent = 'Not marked today';
+      document.getElementById('att-result').style.display = 'none';
+
+      document.querySelectorAll('.att-btn')
+        .forEach(b => b.classList.remove('chosen'));
+
+      return;
+    }
+
+    const type = row.status;
+
+    markChosenUI(type);
+
+    document.getElementById('att-state').textContent =
+      type + ' — already marked today';
+
+    document.getElementById('att-result').style.display = 'block';
+
+    document.getElementById('att-result').innerHTML =
+      `<div class="lbox">
+        Already marked: <strong>${type}</strong>
+        <span class="sync sync-ok">✅ In ERPNext</span>
+      </div>`;
+
+  } catch (e) {
+    console.error('Attendance lookup failed:', e);
+  }
+}
+// ══════════════════════════════════════════════════════════
+//  ATTENDANCE
+// ══════════════════════════════════════════════════════════
+const ERP_STATUS = {
+  'Present' : 'Present',
+  'On Field': 'Half Day',
+  'Leave'   : 'On Leave',
+  'Absent'  : 'Absent'
+};
+
+function markChosenUI(status){
+  document.querySelectorAll('.att-btn').forEach(b=>b.classList.remove('chosen'));
+  const id = 'btn-'+status.replace(/ /g,'');
+  const el = document.getElementById(id);
+  if(el) el.classList.add('chosen');
+}
+
+async function markAttend(status){
+    if (!S.empId) {
+    toast('Please select employee first');
+    return;
+  }
+
+  markChosenUI(status);
+  document.getElementById('att-state').textContent = status + ' — saving...';
+  document.getElementById('att-result').style.display = 'block';
+  const syncId = 'att-sync-'+Date.now();
+  document.getElementById('att-result').innerHTML =
+    '<div class="lbox">Marking <strong>'+status+'</strong>...<br><span id="'+syncId+'">'+syncBadge('pending')+'</span></div>';
+  toast('Marking attendance: '+status);
+
+  try{
+    const existing = await getDoc('Attendance',
+      [['employee','=',S.empId],['attendance_date','=',todayISO()]],
+      ['name']);
+
+    let docName, result;
+    const doc = {
+      doctype              : 'Attendance',
+      employee             : S.empId,
+      attendance_date      : todayISO(),
+      status               : ERP_STATUS[status] || 'Present',
+      company              : S.company,
+      custom_attendance_type: status
+    };
+
+    if(existing.length){
+      result  = await updateDoc('Attendance', existing[0].name, doc);
+      docName = existing[0].name;
+    } else {
+      result  = await saveDoc('Attendance', doc);
+      docName = result.data ? result.data.name : '';
+    }
+
+    document.getElementById(syncId).innerHTML = syncBadge('ok', '/app/attendance/'+docName);
+    document.getElementById('att-state').textContent = status + ' — marked at ' + fmtDT(now());
+    toast('✅ Attendance saved: '+status);
+  }catch(e){
+    document.getElementById(syncId).innerHTML = syncBadge('err');
+    document.getElementById('att-state').textContent = status + ' — save failed';
+    console.error('Attendance ERPNext:', e);
+    toast('❌ Attendance save failed');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  GPS
+// ══════════════════════════════════════════════════════════
+function getCoords(){
+  return new Promise((res,rej)=>{
+    if(!navigator.geolocation){rej(new Error('GPS not supported'));return;}
+    navigator.geolocation.getCurrentPosition(res, err=>{
+      const msgs=['','Location permission denied','GPS unavailable — check device settings','GPS timed out'];
+      rej(new Error(msgs[err.code]||'GPS error'));
+    },{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  MAP (Leaflet)
+// ══════════════════════════════════════════════════════════
+let map = null;
+let markersLayer = null;
+let routeLine = null;
+
+function initMap(lat,lon){
+  if(map){map.remove();map=null;}
+  map = L.map('map',{zoomControl:true,attributionControl:false}).setView([lat,lon],14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+  markersLayer = L.layerGroup().addTo(map);
+  routeLine = null;
+}
+
+function makeMarker(lat,lon,color,size,title){
+  const icon = L.divIcon({className:'',
+    html:'<div style="background:'+color+';width:'+size+'px;height:'+size+'px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>',
+    iconSize:[size,size],iconAnchor:[size/2,size/2]});
+  return L.marker([lat,lon],{icon}).bindPopup('<b>'+title+'</b><br>'+fmtCoords(lat,lon));
+}
+
+function fitMap(){
+  if(!map) return;
+  const bounds = [];
+  if(S.startPoint) bounds.push([S.startPoint.lat, S.startPoint.lon]);
+  if(S.stopPoint)  bounds.push([S.stopPoint.lat,  S.stopPoint.lon]);
+  if(bounds.length > 1) map.fitBounds(L.latLngBounds(bounds),{padding:[32,32]});
+  else if(bounds.length === 1) map.setView(bounds[0],15);
+}
+
+// ══════════════════════════════════════════════════════════
+//  GOOGLE DIRECTIONS API — road route polyline
+// ══════════════════════════════════════════════════════════
+
+// Decode Google's encoded polyline format
+function decodePolyline(encoded){
+  const pts=[]; let idx=0,lat=0,lng=0;
+  while(idx<encoded.length){
+    let b,shift=0,result=0;
+    do{b=encoded.charCodeAt(idx++)-63;result|=(b&0x1f)<<shift;shift+=5;}while(b>=0x20);
+    lat+=(result&1)?~(result>>1):(result>>1);
+    shift=0;result=0;
+    do{b=encoded.charCodeAt(idx++)-63;result|=(b&0x1f)<<shift;shift+=5;}while(b>=0x20);
+    lng+=(result&1)?~(result>>1):(result>>1);
+    pts.push([lat/1e5,lng/1e5]);
+  }
+  return pts;
+}
+
+async function drawRoadRoute(lat1, lon1, lat2, lon2) {
+  const res = await fetch(
+    '/api/method/sonali.custom_functions.sales_track.get_route',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': getCsrf()
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        origin_lat: lat1,
+        origin_lon: lon1,
+        dest_lat: lat2,
+        dest_lon: lon2
+      })
+    }
+  );
+
+  const j = await res.json();
+
+  if (j.exc) {
+    console.error("Route API error:", j);
+    throw new Error("Route fetch failed");
+  }
+
+  const route = j.message;
+
+  const decoded = polyline.decode(route.polyline);
+
+  if (routeLine) {
+    map.removeLayer(routeLine);
+    routeLine = null;
+  }
+
+  routeLine = L.polyline(decoded, {
+    color: '#2563eb',
+    weight: 5,
+    opacity: 0.8
+  }).addTo(map);
+
+  map.fitBounds(routeLine.getBounds(), {
+    padding: [30, 30]
+  });
+
+  return {
+    distance: route.distance_text,
+    duration: route.duration_text,
+    distance_km: route.distance_value / 1000,
+    duration_minutes: Math.round(route.duration_value / 60)
+  };
+}
+// ══════════════════════════════════════════════════════════
+//  LOCATION TRACKING — only start & stop lat/lon stored
+// ══════════════════════════════════════════════════════════
+function setLocStatus(html){ document.getElementById('loc-status').innerHTML = html; }
+
+async function startTracking(){
+    if (!S.empId) {
+    toast('Please select employee first');
+    return;
+  }
+
+  if(S.tracking) return;
+  setLocStatus('<span style="color:var(--cy)">⌛ Getting GPS fix...</span>');
+  try{
+    const p   = await getCoords();
+    const lat = p.coords.latitude, lon = p.coords.longitude, t = now();
+    S.tracking   = true;
+    S.startPoint = {lat, lon, time: t};
+    S.stopPoint  = null;
+
+    // UI state
+    document.getElementById('btn-loc-start').disabled = true;
+    document.getElementById('btn-loc-start').classList.add('btn-gray');
+    document.getElementById('btn-loc-stop').disabled = false;
+    document.getElementById('btn-loc-stop').classList.remove('btn-gray');
+    document.getElementById('loc-from').textContent = '✅';
+    document.getElementById('loc-to').textContent   = '—';
+
+    // Initialise map and place start marker
+    initMap(lat, lon);
+    makeMarker(lat, lon, '#16a34a', 20, 'Start — '+fmtDT(t)).addTo(markersLayer);
+    setTimeout(()=>{ if(map) map.invalidateSize(); }, 250);
+
+    setLocStatus(
+      '<strong>Tracking active</strong> <span class="pulse" style="color:var(--cg)">●</span><br>'+
+      '🟢 <b>Start:</b> '+fmtCoords(lat,lon)+
+      '<br><small>'+fmtDT(t)+'</small>'+
+      '<br><small style="color:var(--c1)">Tap Stop when you reach your destination</small>'
+    );
+
+    // Persist start point to ERPNext
+    await saveLocationPoint('Start', lat, lon);
+
+    toast('▶ Location tracking started');
+  }catch(e){
+    setLocStatus('<span style="color:var(--cr)">❌ '+e.message+'</span>');
+    toast('GPS error: '+e.message);
+  }
+}
+
+async function stopTracking(){
+  if(!S.tracking) return;
+  S.tracking = false;
+
+  // Flip buttons immediately
+  document.getElementById('btn-loc-start').disabled = false;
+  document.getElementById('btn-loc-start').classList.remove('btn-gray');
+  document.getElementById('btn-loc-stop').disabled = true;
+  document.getElementById('btn-loc-stop').classList.add('btn-gray');
+
+  setLocStatus('<span style="color:var(--cy)">⌛ Getting stop location...</span>');
+  try{
+    const p   = await getCoords();
+    const lat = p.coords.latitude, lon = p.coords.longitude, t = now();
+    S.stopPoint = {lat, lon, time: t};
+    document.getElementById('loc-to').textContent = '✅';
+
+    // Add stop marker
+    makeMarker(lat, lon, '#dc2626', 20, 'Stop — '+fmtDT(t)).addTo(markersLayer);
+
+    setLocStatus('<span style="color:var(--cy)">⌛ Drawing road route...</span>');
+
+    // Draw road route via Directions API
+    const from = S.startPoint;
+    const road = await drawRoadRoute(from.lat, from.lon, lat, lon);
+
+    fitMap();
+    setTimeout(()=>{ if(map) map.invalidateSize(); }, 250);
+
+    setLocStatus(
+      '<strong>Session complete ■</strong><br>'+
+      '🟢 <b>Start:</b> '+fmtCoords(from.lat,from.lon)+' · '+fmtDT(from.time)+'<br>'+
+      '🔴 <b>Stop:</b> '+fmtCoords(lat,lon)+' · '+fmtDT(t)+'<br>'+
+      '🛣️ <b>Distance:</b> '+road.distance+(road.duration!=='N/A'?' · '+road.duration:'')+
+      (road.note?'<br><small style="color:var(--text2)">'+road.note+'</small>':'')
+    );
+
+    const log = {
+      date: todayISO(),
+    
+      from_lat: from.lat,
+      from_lon: from.lon,
+    
+      to_lat: lat,
+      to_lon: lon,
+    
+      from_time: fmtDT(from.time),
+      to_time: fmtDT(t),
+    
+      start_iso: from.time.toISOString().slice(0,19).replace('T',' '),
+      stop_iso: t.toISOString().slice(0,19).replace('T',' '),
+    
+      distance: road.distance,
+      duration: road.duration,
+    
+      distance_km: road.distance_km,
+      duration_minutes: road.duration_minutes,
+    
+      note: road.note,
+      employee: S.empId || S.employee || ''
+    };
+    S.locLogs.push(log);
+    renderLocLog(log);
+
+    toast('■ Stopped — '+road.distance);
+
+    // Persist stop point and session log to ERPNext
+    await saveLocationPoint('Stop', lat, lon);
+    await saveTravelLog(log);
+const ts = await createTimesheetDraft(log);
+
+S.currentTimesheet = ts.name;
+
+toast('Timesheet draft created');
+    
+  }catch(e){
+    console.error('stopTracking:', e);
+    toast('Stop error: '+e.message);
+  }
+}
+
+// ── Save individual GPS point to ERPNext ─────────────────
+async function saveLocationPoint(type, lat, lon) {
+  const res = await fetch(
+    '/api/method/sonali.custom_functions.sales_track.save_location_point',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': getCsrf()
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        employee: S.empId,
+        tracking_type: type,
+        latitude: lat,
+        longitude: lon,
+        address: `${lat}, ${lon}`
+      })
+    }
+  );
+
+  const j = await res.json();
+
+    if (j.exc) {
+        console.error("saveLocationPoint error", j);
+        throw new Error(j.exc);
+    }
+
+  return j;
+}
+
+// ── Render log card in UI ─────────────────────────────────
+function renderLocLog(log){
+  const el = document.getElementById('loc-logs');
+  if(el.querySelector('.empty')) el.innerHTML = '';
+  const syncId    = 'locsync-'+Date.now();
+  const fromMapUrl= 'https://maps.google.com/?q='+log.from_lat+','+log.from_lon;
+  const toMapUrl  = 'https://maps.google.com/?q='+log.to_lat+','+log.to_lon;
+  const dirUrl    = 'https://www.google.com/maps/dir/'+log.from_lat+','+log.from_lon+'/'+log.to_lat+','+log.to_lon;
+  const d = document.createElement('div'); d.className = 'loc-log-card';
+  d.innerHTML =
+    '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">'+
+      '<div style="width:10px;height:10px;border-radius:50%;background:#16a34a;flex-shrink:0;margin-top:3px"></div>'+
+      '<div>'+
+        '<div class="loc-label">Start · '+log.from_time+'</div>'+
+        '<div class="loc-coords">'+fmtCoords(log.from_lat,log.from_lon)+'</div>'+
+        '<a href="'+fromMapUrl+'" target="_blank" style="font-size:11px;color:var(--c1)">Open in Maps ↗</a>'+
+      '</div>'+
+    '</div>'+
+    '<div style="border-left:2px dashed #93c5fd;height:14px;margin-left:4px"></div>'+
+    '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">'+
+      '<div style="width:10px;height:10px;border-radius:50%;background:#dc2626;flex-shrink:0;margin-top:3px"></div>'+
+      '<div>'+
+        '<div class="loc-label">Stop · '+log.to_time+'</div>'+
+        '<div class="loc-coords">'+fmtCoords(log.to_lat,log.to_lon)+'</div>'+
+        '<a href="'+toMapUrl+'" target="_blank" style="font-size:11px;color:var(--c1)">Open in Maps ↗</a>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">'+
+      '<div>'+
+        '<div class="loc-dist-badge">🛣️ '+log.distance+(log.duration!=='N/A'?' · '+log.duration:'')+'</div>'+
+        '<div style="margin-top:5px"><a href="'+dirUrl+'" target="_blank" style="font-size:11px;color:var(--c1);font-weight:500">▶ Open Directions in Google Maps ↗</a></div>'+
+        (log.note?'<div style="font-size:10px;color:var(--text2);margin-top:2px">'+log.note+'</div>':'')+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--text2)">📅 '+log.date+'</div>'+
+    '</div>'+
+    '<div id="'+syncId+'">'+syncBadge('pending')+'</div>';
+  el.insertBefore(d, el.firstChild);
+}
+
+// ── Save Location Log doctype to ERPNext ─────────────────
+async function saveTravelLog(log) {
+  const res = await fetch(
+    '/api/method/sonali.custom_functions.sales_track.save_travel_log',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': getCsrf()
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        employee: S.empId,
+        start_latitude: log.from_lat,
+        start_longitude: log.from_lon,
+        stop_latitude: log.to_lat,
+        stop_longitude: log.to_lon,
+        start_time: log.start_iso,
+        stop_time: log.stop_iso,
+        distance_km: log.distance_km,
+        duration_minutes: log.duration_minutes
+      })
+    }
+  );
+
+  const j = await res.json();
+
+if (j.exc) {
+    console.error("saveTravelLog error", j);
+    throw new Error(j.exc);
+}
+
+  return j;
+}
+
+// ══════════════════════════════════════════════════════════
+//  TIMESHEET
+// ══════════════════════════════════════════════════════════
+function selWT(btn, type){
+  document.querySelectorAll('.wtype-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel'); S.workType = type;
+}
+
+const WT_ICONS = {
+  Call:'📞', Meeting:'🤝', Visit:'🚗', 'Follow-up':'🔄',
+  'Payment Collection':'💰', 'Sample Submission':'📦', 'Quotation Discussion':'📄'
+};
+
+async function submitTimesheet(){
+    if (!S.empId) {
+    toast('Please select employee first');
+    return;
+  }
+  const date     = document.getElementById('ts-date').value;
+  const customer = document.getElementById('ts-customer').value.trim();
+  const remarks  = document.getElementById('ts-remarks').value.trim();
+  const outcome  = document.getElementById('ts-outcome').value.trim();
+  const followup = document.getElementById('ts-followup').value;
+
+  if(!date)     { toast('⚠ Select a date'); return; }
+  if(!customer) { toast('⚠ Enter customer name'); return; }
+  if(!remarks)  { toast('⚠ Enter remarks'); return; }
+  if(!outcome)  { toast('⚠ Enter outcome / next action'); return; }
+
+  const entry = {date, emp:S.employee, customer, workType:S.workType, remarks, outcome, followup, at:now()};
+  S.tsEntries.push(entry);
+
+  // Render card immediately
+  const el = document.getElementById('ts-log');
+  if(el.querySelector('.empty')) el.innerHTML = '';
+  const syncId = 'ts-sync-'+Date.now();
+  const wt     = S.workType; // capture before reset
+  const d = document.createElement('div'); d.className = 'ts-card';
+  d.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'+
+      '<span class="ts-badge">'+(WT_ICONS[wt]||'📋')+' '+wt+'</span>'+
+      '<span style="font-size:11px;color:var(--text2)">'+date+'</span>'+
+    '</div>'+
+    '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">'+customer+'</div>'+
+    '<div style="font-size:12px;color:#374151;line-height:1.8">'+
+      '<b>Employee:</b> '+S.employee+'<br>'+
+      '<b>Remarks:</b> '+remarks+'<br>'+
+      '<b>Outcome:</b> '+outcome+
+      (followup?'<br>📅 <b>Next follow-up:</b> '+followup:'')+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--text2);margin-top:4px">Submitted '+fmtDT(entry.at)+'</div>'+
+    '<div id="'+syncId+'">'+syncBadge('pending')+'</div>';
+  el.insertBefore(d, el.firstChild);
+
+  // Reset form
+  document.getElementById('ts-customer').value = '';
+  document.getElementById('ts-remarks').value  = '';
+  document.getElementById('ts-outcome').value  = '';
+  document.getElementById('ts-followup').value = '';
+  document.querySelectorAll('.wtype-btn').forEach(b=>b.classList.remove('sel'));
+  document.querySelector('.wtype-btn').classList.add('sel');
+  S.workType = 'Call';
+  toast('Submitting timesheet...');
+
+  // → ERPNext Timesheet
+  try {
+  if (!S.currentTimesheet) {
+    toast('Please complete location tracking first');
+    document.getElementById(syncId).innerHTML = syncBadge('err');
+    return;
+  }
+
+  const res = await fetch(
+    '/api/method/sonali.custom_functions.sales_track.update_timesheet_details',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': getCsrf()
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        timesheet_name: S.currentTimesheet,
+        customer_name: customer,
+        work_type: wt,
+        remarks: remarks,
+        outcome: outcome,
+        next_followup: followup || ''
+      })
+    }
+  );
+
+  const j = await res.json();
+
+  if (j.exc) {
+    throw new Error(j.exc);
+  }
+
+  document.getElementById(syncId).innerHTML =
+    syncBadge('ok', '/app/timesheet/' + S.currentTimesheet);
+
+  toast('✅ Timesheet updated');
+
+} catch (e) {
+  document.getElementById(syncId).innerHTML = syncBadge('err');
+  console.error('Timesheet ERPNext:', e);
+  toast('❌ Timesheet save failed');
+}
+}
+
+async function createTimesheetDraft(log) {
+  const res = await fetch(
+    '/api/method/sonali.custom_functions.sales_track.create_timesheet_draft',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': getCsrf()
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        employee: S.empId,
+        start_time: log.start_iso,
+        stop_time: log.stop_iso,
+        distance_km: log.distance_km,
+        duration_minutes: log.duration_minutes
+      })
+    }
+  );
+
+  const j = await res.json();
+
+  if (j.exc) throw new Error(j.exc);
+
+  return j.message;
+}
+
+// ══════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════
+document.getElementById('hdr-date').textContent =
+  now().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+document.getElementById('ts-date').value = todayISO();
+initUser();
+
+// Initialise a default map view so the map tile loads on first open
+window.addEventListener('load', ()=>{
+  initMap(11.0168, 76.9558); // default centre — will re-init on first Start
+});
+</script>
+</body>
+</html>
